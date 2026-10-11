@@ -10,13 +10,15 @@
 
 | Группа (клавиша) | Что делает |
 |---|---|
-| **Камера** (F2) | Камера дальше и выше от персонажа (`ExtraDistance`, `ExtraHeight`) |
-| **Тряска и отдача** (F3) | Масштаб тряски экрана; отдача при стрельбе следует за ним (`ShakeScale`) |
-| **FOV** (F4) | Убирает расширение FOV при спринте и от способностей/предметов (`LimitAbilityFov`; тонко — `SprintFovScale`, `AbilityFovMaxIncrease` в файле); приближение (прицелы) не трогает |
-| **Мышь** (F5) | Сглаживание поворота (`LookSmoothing`, сохраняет общий угол), опциональная помощь прицела (`AimStickiness`); ограничитель резких рывков `MaxLookPerFrame` — только в файле |
-| **Картинка** (F6) | Числа урона (суммирование), красная подсветка урона, вспышки, частицы эффектов, насыщенность/контраст/яркость, bloom, туман, автобаланс цвета |
-| **Мастер** (F7) | Весь мод вкл/выкл. Выключено = обычная игра |
-| **Сила** (F8) | Переключает общую силу 100% / 70% / 40% (`Strength`) |
+| **Камера** (`CameraToggle`) | Камера дальше и выше от персонажа (`ExtraDistance`, `ExtraHeight`) |
+| **Тряска и отдача** (`ShakeToggle`) | Масштаб тряски экрана; отдача при стрельбе следует за ним (`ShakeScale`) |
+| **FOV** (`FovToggle`) | Убирает расширение FOV при спринте и от способностей/предметов (`LimitAbilityFov`; тонко — `SprintFovScale`, `AbilityFovMaxIncrease` в файле); приближение (прицелы) не трогает |
+| **Мышь** (`MouseToggle`) | Сглаживание поворота (`LookSmoothing`, сохраняет общий угол), опциональная помощь прицела (`AimStickiness`); ограничитель резких рывков `MaxLookPerFrame` — только в файле |
+| **Картинка** (`VisualsToggle`) | Числа урона (суммирование), красная подсветка урона, вспышки, частицы эффектов, насыщенность/контраст/яркость, bloom, туман, автобаланс цвета |
+| **Мастер** (`MasterToggle`) | Весь мод вкл/выкл. Выключено = обычная игра |
+| **Сила** (`StrengthCycle`) | Переключает общую силу 100% / 70% / 40% (`Strength`) |
+
+**Горячие клавиши по умолчанию не назначены.** Чтобы пользоваться ими, впишите клавишу в файле `BepInEx/config/local.RoR2Comfort.cfg`, раздел `[Hotkeys]`, например `MasterToggle = F7`.
 
 ### Новое в 0.4.x
 
@@ -36,7 +38,7 @@
 
 ### Индикатор
 
-При переключении вся картинка на долю секунды вспыхивает **зелёным (вкл)** или **красным (выкл)**, а сверху экрана висит надпись `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF`. Так сразу видно, работает ли мод, и можно быстро сравнивать «с модом» и «без». Надпись отключается (`ShowIndicator`).
+**По умолчанию выключен** (`ShowIndicator = false`). Если включить: при запуске и при переключении мода клавишей вся картинка на долю секунды вспыхивает **зелёным (вкл)** или **красным (выкл)**, а сверху экрана висит надпись `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF`. Так сразу видно, работает ли мод, и можно быстро сравнивать «с модом» и «без».
 
 ## Установка
 
@@ -67,13 +69,13 @@
 | `BreakReminderMinutes` | 0 | напоминание о перерыве (0 = выкл) |
 | `AimStickiness` | 0 | помощь прицела, выкл |
 
-Значения подобраны под одного человека; подстраивайте под себя. Всё, что скрывает информацию (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`), делает игру менее читаемой — если стало труднее, верните эти значения ближе к оригиналу. Быстрое сравнение «с модом / без»: клавиша F7.
+Значения подобраны под одного человека; подстраивайте под себя. Всё, что скрывает информацию (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`), делает игру менее читаемой — если стало труднее, верните эти значения ближе к оригиналу. Быстрое сравнение «с модом / без»: назначьте `MasterToggle` (например, F7).
 
 ## Известные ограничения
 
 - Другие моды, которые меняют камеру/FOV/постобработку, могут конфликтовать.
 - Частицы уменьшаются в количестве, а не отключаются полностью, а эффекты с «telegraph/warning/indicator/charge» в названии не затрагиваются. Это эвристика по имени, она не идеальна.
-- Автобаланс цвета оценивает среднюю картинку экрана 2 раза в секунду и плавно (за секунды) корректирует цвет; он новый и проверялся мало. Если мешает — поставьте `AutoColorStrength` в 0 (или клавишей F6 выключите всю группу «Картинка»).
+- Автобаланс цвета оценивает среднюю картинку экрана 2 раза в секунду и плавно (за секунды) корректирует цвет; он новый и проверялся мало. Если мешает — поставьте `AutoColorStrength` в 0 (или назначьте `VisualsToggle` и выключайте всю группу «Картинка»).
 - Освещение сцены не переписывается; цвет подстраивается цветокоррекцией, туманом и автобалансом.
 - Сглаживание мыши (`LookSmoothing`) добавляет небольшую задержку прицела; для точной стрельбы можно поставить 0.
 - Проверено на сборке игры 1.5.0 (Steam build 25475991). После обновлений игры может потребоваться пересборка.
@@ -81,6 +83,7 @@
 
 ## История версий
 
+- **0.4.2** — надпись `COMFORT` сверху и вспышка выключены по умолчанию; все горячие клавиши по умолчанию не назначены (назначаются в файле настроек).
 - **0.4.1** — убрана комфортная виньетка (затемнение краёв при поворотах мешала); из настроек удалены все её параметры.
 - **0.4.0** — общая сила (`Strength`, F8) и усиление по стадиям; адаптивный лимит эффектов; суммирование чисел урона; ограничитель вспышек; автобаланс цвета; напоминание о перерыве; опциональная помощь прицела; пакет для Thunderstore.
 - **0.3.2** — камера больше не влияет на поиск целей/взаимодействие (компенсация в `ModifyAimRayIfApplicable`); bloom больше не включается принудительно; эффекты с триггерами/столкновениями частиц не затрагиваются.
@@ -113,13 +116,15 @@ A **Risk of Rain 2** mod against motion sickness: it removes or tones down the t
 
 | Group (key) | What it does |
 |---|---|
-| **Camera** (F2) | Camera farther and higher (`ExtraDistance`, `ExtraHeight`) |
-| **Shake & recoil** (F3) | Scale screen shake; firing recoil follows it (`ShakeScale`) |
-| **FOV** (F4) | Removes FOV widening from sprinting and abilities/items (`LimitAbilityFov`; fine-tuning `SprintFovScale`, `AbilityFovMaxIncrease` in the file); zooming in (scopes) is untouched |
-| **Mouse** (F5) | Look smoothing (conserves total turned angle) and optional aim assist (`LookSmoothing`, `AimStickiness`); the flick limiter `MaxLookPerFrame` is file-only |
-| **Visuals** (F6) | Damage numbers (aggregation), hurt tint, flashes, effect particle counts, saturation/contrast/exposure, bloom, fog, automatic color balance |
-| **Master** (F7) | Whole mod on/off. Off = vanilla |
-| **Strength** (F8) | Cycles overall strength 100% / 70% / 40% (`Strength`) |
+| **Camera** (`CameraToggle`) | Camera farther and higher (`ExtraDistance`, `ExtraHeight`) |
+| **Shake & recoil** (`ShakeToggle`) | Scale screen shake; firing recoil follows it (`ShakeScale`) |
+| **FOV** (`FovToggle`) | Removes FOV widening from sprinting and abilities/items (`LimitAbilityFov`; fine-tuning `SprintFovScale`, `AbilityFovMaxIncrease` in the file); zooming in (scopes) is untouched |
+| **Mouse** (`MouseToggle`) | Look smoothing (conserves total turned angle) and optional aim assist (`LookSmoothing`, `AimStickiness`); the flick limiter `MaxLookPerFrame` is file-only |
+| **Visuals** (`VisualsToggle`) | Damage numbers (aggregation), hurt tint, flashes, effect particle counts, saturation/contrast/exposure, bloom, fog, automatic color balance |
+| **Master** (`MasterToggle`) | Whole mod on/off. Off = vanilla |
+| **Strength** (`StrengthCycle`) | Cycles overall strength 100% / 70% / 40% (`Strength`) |
+
+**Hotkeys are unassigned by default.** To use them, put a key name into `BepInEx/config/local.RoR2Comfort.cfg`, section `[Hotkeys]`, e.g. `MasterToggle = F7`.
 
 ### New in 0.4.x
 
@@ -137,7 +142,7 @@ Also:
 - hides the "NEW" badge text in menus (it overlaps labels in some localizations) — `HideNewBadges`;
 - skips the startup logos and intro video (it waits for the game to finish loading so profiles are read first) — `SkipIntro`.
 
-**Indicator:** toggling flashes the screen **green (on)** or **red (off)** and a `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF` label stays at the top of the screen (`ShowIndicator`).
+**Indicator:** off by default (`ShowIndicator = false`). When on, startup and hotkey toggles flash the screen **green (on)** or **red (off)** and a `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF` label stays at the top of the screen.
 
 ### Install
 
@@ -146,7 +151,7 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 ### Notes
 
 - Defaults are tuned for one person; adjust to taste. `FogScale` below 1 darkens the scene because the game's fog also lights the distance — raise `Exposure` to compensate.
-- Anything that hides information (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Press F7 for a quick with/without comparison.
+- Anything that hides information (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Assign `MasterToggle` (e.g. F7) for a quick with/without comparison.
 - Bloom is never force-enabled: if you turned it off in the game's settings it stays off (`LimitBloom` only caps its intensity).
 - Automatic color balance samples the screen twice a second and corrects slowly; it is new and lightly tested. Set `AutoColorStrength` to 0 if it bothers you.
 - `LookSmoothing` adds a little input lag; set it to 0 for the snappiest aim.
@@ -155,6 +160,7 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 
 ### Changelog
 
+- **0.4.2** — the on-screen `COMFORT` label and flash are off by default; all hotkeys are unassigned by default (assign them in the config file).
 - **0.4.1** — removed the comfort vignette (edge darkening on turns was bothersome); all its settings are gone.
 - **0.4.0** — overall strength (`Strength`, F8) and stage ramp; adaptive effect limit; aggregated damage numbers; flash limiter; automatic color balance; break reminder; optional aim assist; Thunderstore package.
 - **0.3.2** — camera offset no longer affects targeting/interaction searches; bloom is no longer force-enabled; particle systems with trigger/collision modules are left alone.
