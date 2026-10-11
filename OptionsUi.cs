@@ -26,6 +26,8 @@ namespace RoR2Comfort
                 "Reduces motion sickness triggers. Hotkeys are unassigned by default (see the config file, [Hotkeys]).",
                 "Снижает причины укачивания. Горячие клавиши по умолчанию не назначены (см. файл настроек, раздел [Hotkeys])."));
 
+            SetIcon();
+
             string general = T("General", "Общее");
             string camera = T("Camera & mouse", "Камера и мышь");
             string picture = T("Picture & color", "Картинка и цвет");
@@ -128,6 +130,36 @@ namespace RoR2Comfort
                 T("Reduce only when busy", "Сокращать только при большой нагрузке"),
                 T("On: effects are original while it is calm. Off: always reduced.",
                   "Вкл: пока спокойно, эффекты как в игре. Выкл: сокращать всегда."));
+        }
+
+        // The mod icon shown next to the name in the Risk of Options list (icon.png is embedded in the DLL).
+        private static void SetIcon()
+        {
+            try
+            {
+                using (System.IO.Stream s = typeof(OptionsUi).Assembly.GetManifestResourceStream("icon.png"))
+                {
+                    if (s == null) return;
+                    byte[] bytes = new byte[s.Length];
+                    int read = 0;
+                    while (read < bytes.Length)
+                    {
+                        int n = s.Read(bytes, read, bytes.Length - read);
+                        if (n <= 0) break;
+                        read += n;
+                    }
+
+                    Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    if (!ImageConversion.LoadImage(tex, bytes)) return;
+                    tex.filterMode = FilterMode.Bilinear;
+                    Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                    RiskOfOptions.ModSettingsManager.SetModIcon(sprite, Plugin.Guid, Plugin.Name);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Could not set the mod icon: " + e.Message);
+            }
         }
 
         private static void Safe(Action add, string what)
