@@ -77,8 +77,6 @@ namespace RoR2Comfort
 
     internal static class Cfg
     {
-        public static event Action Changed;
-
         // General
         public static ConfigEntry<float> Strength;
         public static ConfigEntry<bool> Progressive;
@@ -146,9 +144,9 @@ namespace RoR2Comfort
             FarEffectScale = c.Bind("Effects", "FarEffectScale", 0.5f, "[Advanced] Extra scale for far effects.");
             ProtectTelegraphs = c.Bind("Effects", "ProtectTelegraphs", true, "[Advanced] Never reduce effects whose name looks like a warning/telegraph/indicator/charge-up.");
 
-            Saturation = c.Bind("Color", "Saturation", -25f, "Color saturation adjustment (-100 grey .. 0 vanilla).");
-            Contrast = c.Bind("Color", "Contrast", 0f, "Contrast adjustment (negative = flatter/hazier, 0 = vanilla, positive = punchier).");
-            Exposure = c.Bind("Color", "Exposure", 0.5f, "Brightness in EV stops (negative = darker, positive = brighter).");
+            Saturation = c.Bind("Color", "Saturation", -15f, "Color saturation change relative to the game's own picture (-100 grey .. 0 = unchanged).");
+            Contrast = c.Bind("Color", "Contrast", 0f, "Contrast change relative to the game's own picture (negative = flatter/hazier, 0 = unchanged, positive = punchier).");
+            Exposure = c.Bind("Color", "Exposure", 0f, "Brightness change in EV stops relative to the game's own picture (negative = darker, 0 = unchanged, positive = brighter).");
             FogScale = c.Bind("Color", "FogScale", 0.65f, "Strength of the game's depth fog / haze: 1 = vanilla. Note: the fog also lights up the distance, so very low values make the scene dark - raise Exposure to compensate.");
             LimitBloom = c.Bind("Color", "LimitBloom", true, "Cap bloom (glow) intensity with the value below. Bloom is never switched on if the game's own setting has it off.");
             BloomIntensity = c.Bind("Color", "BloomIntensity", 0.15f, "Bloom intensity used when LimitBloom is on.");
@@ -165,8 +163,6 @@ namespace RoR2Comfort
             MouseKey = c.Bind("Hotkeys", "MouseToggle", new KeyboardShortcut(KeyCode.None), "Toggle mouse smoothing and aim stickiness. Unassigned by default, e.g. F5.");
             VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.None), "Toggle colors, bloom, flashes, particles and damage numbers. Unassigned by default, e.g. F6.");
             StrengthKey = c.Bind("Hotkeys", "StrengthCycle", new KeyboardShortcut(KeyCode.None), "Cycle overall strength 100% / 70% / 40%. Unassigned by default, e.g. F8.");
-
-            c.SettingChanged += (s, a) => { if (Changed != null) Changed(); };
         }
     }
 }
