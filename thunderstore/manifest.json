@@ -1,6 +1,6 @@
 {
   "name": "RoR2Comfort",
-  "version_number": "0.4.3",
+  "version_number": "0.4.4",
   "website_url": "https://github.com/kantemiir/RoR2Comfort",
   "description": "Motion-sickness comfort for Risk of Rain 2: camera, shake, FOV, mouse, flashes, particles, color. Adjustable in-game via Risk of Options.",
   "dependencies": [
