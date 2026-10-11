@@ -62,7 +62,7 @@
 | `DamageNumbers` | Aggregate | Show / Aggregate / Hide |
 | `ScreenDamageScale` | 0.3 | красная подсветка урона и полноэкранные вспышки |
 | `ParticleCountScale` / `AdaptiveParticles` | 0.5 / вкл | минимум количества частиц под нагрузкой |
-| `Saturation` / `Contrast` / `Exposure` | −25 / 0 / +0.5 | цветокоррекция |
+| `Saturation` / `Contrast` / `Exposure` | −15 / 0 / 0 | поправка к картинке самой игры: 0 = без изменений |
 | `LimitBloom` / `BloomIntensity` | вкл / 0.15 | ограничивает силу bloom; сам bloom мод не включает, если он выключен в настройках игры |
 | `FogScale` | 0.65 | 1 = как в игре; туман ещё и подсвечивает даль, при очень низких значениях сцена темнеет — поднимайте `Exposure` |
 | `AutoColorStrength` | 0.6 | автобаланс однотонных сцен (0 = выкл) |
@@ -83,6 +83,7 @@
 
 ## История версий
 
+- **0.4.4** — исправлена «пелена»: раньше насыщенность/контраст/яркость задавались абсолютными значениями и подменяли собственную цветокоррекцию игры (у игры контраст ≈ 42, мод ставил 0–5), из-за чего картинка тускнела и при `Strength` = 0. Теперь это поправки поверх картинки игры: 0 = без изменений, `Strength` 0 или выключенный мод = оригинал. Значения `Contrast` и `Exposure` в старых настройках стоит сбросить в 0.
 - **0.4.3** — иконка мода в списке Risk of Options (вместо знака вопроса).
 - **0.4.2** — надпись `COMFORT` сверху и вспышка выключены по умолчанию; все горячие клавиши по умолчанию не назначены (назначаются в файле настроек).
 - **0.4.1** — убрана комфортная виньетка (затемнение краёв при поворотах мешала); из настроек удалены все её параметры.
@@ -151,7 +152,7 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 
 ### Notes
 
-- Defaults are tuned for one person; adjust to taste. `FogScale` below 1 darkens the scene because the game's fog also lights the distance — raise `Exposure` to compensate.
+- Defaults are tuned for one person; adjust to taste. `FogScale` below 1 darkens the scene because the game's fog also lights the distance — raise `Exposure` a little to compensate. `Saturation` / `Contrast` / `Exposure` are offsets to the game's own picture (0 = unchanged).
 - Anything that hides information (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Assign `MasterToggle` (e.g. F7) for a quick with/without comparison.
 - Bloom is never force-enabled: if you turned it off in the game's settings it stays off (`LimitBloom` only caps its intensity).
 - Automatic color balance samples the screen twice a second and corrects slowly; it is new and lightly tested. Set `AutoColorStrength` to 0 if it bothers you.
@@ -161,6 +162,7 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 
 ### Changelog
 
+- **0.4.4** — fixed the "veil" look: saturation/contrast/brightness used to be absolute values that replaced the game's own color grading (the game uses contrast ≈ 42, the mod set 0–5), so the picture got dull even at `Strength` 0. They are now offsets on top of the game's picture: 0 = unchanged, and `Strength` 0 / mod off = the original look. Reset `Contrast` and `Exposure` to 0 in old configs.
 - **0.4.3** — mod icon in the Risk of Options list (instead of the question mark).
 - **0.4.2** — the on-screen `COMFORT` label and flash are off by default; all hotkeys are unassigned by default (assign them in the config file).
 - **0.4.1** — removed the comfort vignette (edge darkening on turns was bothersome); all its settings are gone.
