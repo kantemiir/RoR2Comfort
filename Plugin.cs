@@ -20,7 +20,7 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.3.0";
+        public const string Version = "0.3.2";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
@@ -54,6 +54,9 @@ namespace RoR2Comfort
             Patch(typeof(EffectComponent), nameof(EffectComponent.Reset), post: nameof(Patches.EffectResetPost));
             Patch(typeof(RampFogRenderer), "Render", pre: nameof(Patches.FogPre), post: nameof(Patches.FogPost));
             Patch(typeof(RoR2.UI.LanguageTextMeshController), "UpdateLabel", pre: nameof(Patches.NewBadgePre));
+            Patch(typeof(CameraRigController), nameof(CameraRigController.ModifyAimRayIfApplicable), post: nameof(Patches.AimRayPost));
+            Patch(typeof(SplashScreenController), "Start", pre: nameof(Patches.SplashStartPre));
+            Patch(typeof(SplashScreenController), "Finish", pre: nameof(Patches.SplashFinishPre));
 
             if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.rune580.riskofoptions"))
             {
@@ -185,9 +188,11 @@ namespace RoR2Comfort
             grading.contrast.Override(Cfg.Contrast.Value);
             grading.postExposure.Override(Cfg.Exposure.Value);
 
-            bool limitBloom = Cfg.LimitBloom.Value;
-            bloom.enabled.Override(limitBloom);
-            if (limitBloom) bloom.intensity.Override(Cfg.BloomIntensity.Value);
+            // Never force bloom on: the game's own switch (pp_bloom) and the scene volumes decide whether it is
+            // enabled. We only cap the intensity when it is.
+            bloom.enabled.overrideState = false;
+            if (Cfg.LimitBloom.Value) bloom.intensity.Override(Cfg.BloomIntensity.Value);
+            else bloom.intensity.overrideState = false;
         }
     }
 
@@ -217,7 +222,7 @@ namespace RoR2Comfort
         public static ConfigEntry<float> ScreenDamageScale, ParticleCountScale;
         public static ConfigEntry<float> Saturation, Contrast, Exposure, BloomIntensity, FogScale;
         public static ConfigEntry<bool> LimitBloom;
-        public static ConfigEntry<bool> ShowIndicator, HideNewBadges;
+        public static ConfigEntry<bool> ShowIndicator, HideNewBadges, SkipIntro;
         public static ConfigEntry<KeyboardShortcut> MasterKey, CameraKey, ShakeKey, FovKey, MouseKey, VisualsKey;
 
         public static void Bind(ConfigFile c)
@@ -248,6 +253,7 @@ namespace RoR2Comfort
             BloomIntensity = c.Bind("Color", "BloomIntensity", 0.15f, "Bloom intensity used when LimitBloom is on.");
 
             HideNewBadges = c.Bind("Hud", "HideNewBadges", true, "Hide the \"NEW\" (НОВИНКА) badge text in menus; in some languages it overlaps the labels.");
+            SkipIntro = c.Bind("Startup", "SkipIntro", true, "Skip the startup splash screens and the intro cutscene video and go straight to the title screen. Applies on the next game start.");
             ShowIndicator = c.Bind("Indicator", "ShowIndicator", true, "Show a small COMFORT ON/OFF label at the top of the screen. Toggling always flashes the screen green/red.");
             MasterKey = c.Bind("Hotkeys", "MasterToggle", new KeyboardShortcut(KeyCode.F7), "Mod on/off (green/red flash). Off = fully vanilla.");
             CameraKey = c.Bind("Hotkeys", "CameraToggle", new KeyboardShortcut(KeyCode.F2), "Toggle camera distance/height.");
@@ -296,6 +302,24 @@ namespace RoR2Comfort
                 float cap = Mathf.Max(30f, baseFov + Cfg.AbilityFovMaxIncrease.Value);
                 if (dest.fov.value > cap) dest.fov.value = cap;
             }
+        }
+
+        // Keep gameplay independent of how far the camera is pulled back.
+        // The game starts several searches (auto-targeting, interaction, equipment targeting, ping, some ranged
+        // skills) at the camera position and pads the range with the camera-to-body distance. A camera that sits
+        // farther than vanilla would change those cones and ranges, so move the search origin forward by the extra
+        // distance we added; the far end of every search stays exactly where it was.
+        public static void AimRayPost(ref Ray __result, ref float extraRaycastDistance)
+        {
+            if (!State.CameraOn) return;
+            float extra = extraRaycastDistance;
+            if (extra <= 0.001f) return; // no camera rig applied, original ray was returned
+            float shift = Mathf.Min(Cfg.ExtraDistance.Value, extra);
+            if (shift <= 0f) return;
+            Ray r = __result;
+            r.origin += r.direction * shift;
+            __result = r;
+            extraRaycastDistance = extra - shift;
         }
 
         // Sprint FOV widening.
@@ -375,6 +399,48 @@ namespace RoR2Comfort
             if (Cfg.HideNewBadges.Value && ____token == "NEW_UNLOCKABLE") ___resolvedString = "";
         }
 
+        // Startup: skip logo splash + intro video. Uses the game's own skip path (same as the splash_skip / intro_skip convars).
+        // Must NOT jump to the title before the game finished loading (profiles are read at the end of the load),
+        // otherwise the title shows "create profile". So we wait for RoR2Application.loadFinished first.
+        private static bool splashFinishAllowed;
+        private static bool splashWaiting;
+
+        public static bool SplashStartPre(SplashScreenController __instance)
+        {
+            if (!Cfg.SkipIntro.Value) return true;
+            FinishWhenLoaded(__instance);
+            return false;
+        }
+
+        // Ignore the splash animation calling Finish() before loading is done; we call it ourselves when ready.
+        public static bool SplashFinishPre(SplashScreenController __instance)
+        {
+            if (!Cfg.SkipIntro.Value) return true;
+            if (splashFinishAllowed) return true;
+            FinishWhenLoaded(__instance);
+            return false;
+        }
+
+        private static void FinishWhenLoaded(SplashScreenController instance)
+        {
+            if (RoR2Application.loadFinished)
+            {
+                DoFinish(instance);
+            }
+            else if (!splashWaiting)
+            {
+                splashWaiting = true;
+                RoR2Application.onLoad += () => { if (instance) DoFinish(instance); };
+            }
+        }
+
+        private static void DoFinish(SplashScreenController instance)
+        {
+            splashFinishAllowed = true;
+            IntroCutsceneController.shouldSkip = true;
+            instance.Finish();
+        }
+
         public static bool DamageNumberPre()
         {
             if (!State.VisualsOn) return true;
@@ -408,6 +474,8 @@ namespace RoR2Comfort
             for (int i = 0; i < buffer.Count; i++)
             {
                 ParticleSystem ps = buffer[i];
+                // Particle systems that drive trigger/collision events can be gameplay-relevant: leave them alone.
+                if (ps.trigger.enabled || ps.collision.enabled) continue;
                 if (!originals.TryGetValue(ps, out Original o))
                 {
                     if (s >= 0.999f) continue; // nothing changed yet, nothing to restore
@@ -479,6 +547,7 @@ namespace RoR2Comfort
             Check(Cfg.LimitBloom);
             Slider(Cfg.BloomIntensity, 0f, 3f, "{0:0.00}");
             Check(Cfg.HideNewBadges);
+            Check(Cfg.SkipIntro);
             Check(Cfg.ShowIndicator);
         }
 
