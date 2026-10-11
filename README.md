@@ -4,7 +4,7 @@
 
 Мод для **Risk of Rain 2** против укачивания (motion sickness): убирает или ослабляет то, что чаще всего вызывает тошноту, — тряску камеры, отдачу, резкие скачки FOV, рывки мыши, вспышки на экране, лишние частицы и «вырвиглазные» цвета. Каждая настройка меняется прямо в игре.
 
-> Сделан человеком, которого сильно укачивает в поздней игре. Проверен на одном компьютере и в основном на ранних стадиях. Мод не меняет геймплей и баланс: только камеру и картинку на вашем экране (в сетевой игре работает локально, хосту ничего не нужно).
+> Сделан человеком, которого сильно укачивает в поздней игре. Проверен на одном компьютере и в основном на ранних стадиях. Мод не меняет геймплей и баланс: только камеру и картинку на вашем экране (в сетевой игре работает локально, хосту ничего не нужно). Игра использует положение камеры для некоторых поисков (самонаведение, взаимодействие, наведение снаряжения, пинг); мод компенсирует сдвиг камеры, чтобы они работали как в оригинале.
 
 ## Что делает
 
@@ -17,7 +17,9 @@
 | **Картинка** (F6) | Числа урона, красные вспышки при уроне, количество частиц эффектов, насыщенность/контраст/яркость, bloom, сила глубинного тумана |
 | **Мастер** (F7) | Весь мод вкл/выкл. Выключено = обычная игра |
 
-Дополнительно: скрывает текст-бейдж «НОВИНКА/NEW» в меню (в русской локализации он налезает на надписи) — `HideNewBadges`.
+Дополнительно:
+- скрывает текст-бейдж «НОВИНКА/NEW» в меню (в русской локализации он налезает на надписи) — `HideNewBadges`;
+- пропускает логотипы и вступительный ролик при запуске игры (дожидается окончания загрузки, чтобы профили успели прочитаться) — `SkipIntro`.
 
 ### Индикатор
 
@@ -45,10 +47,11 @@
 | `ScreenDamageScale` | 0.3 | красная вспышка при уроне |
 | `ParticleCountScale` | 0.5 | количество частиц эффектов |
 | `Saturation` / `Contrast` / `Exposure` | −25 / 0 / +0.5 | цветокоррекция |
-| `LimitBloom` / `BloomIntensity` | вкл / 0.15 | |
+| `LimitBloom` / `BloomIntensity` | вкл / 0.15 | ограничивает силу bloom; сам bloom мод не включает, если он выключен в настройках игры |
 | `FogScale` | 0.65 | 1 = как в игре; туман ещё и подсвечивает даль, при очень низких значениях сцена темнеет — поднимайте `Exposure` |
+| `HideNewBadges` / `SkipIntro` | вкл / вкл | см. выше |
 
-Значения подобраны под одного человека; подстраивайте под себя.
+Значения подобраны под одного человека; подстраивайте под себя. Всё, что скрывает информацию (`HideDamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`), делает игру менее читаемой — если стало труднее, верните эти значения ближе к оригиналу. Быстрое сравнение «с модом / без»: клавиша F7.
 
 ## Известные ограничения
 
@@ -56,7 +59,14 @@
 - Частицы уменьшаются в количестве, а не отключаются полностью, чтобы не терялись предупреждения о атаках врагов.
 - Цвет на поздних стадиях (например, «всё красное») подстраивается только общей цветокоррекцией и туманом; освещение сцены не переписывается.
 - Проверено на сборке игры 1.5.0 (Steam build 25475991). После обновлений игры может потребоваться пересборка.
+- Сглаживание мыши (`LookSmoothing`) добавляет небольшую задержку прицела; для точной стрельбы можно поставить 0.
 - Если вас укачивает, не полагайтесь только на мод: короткие сессии и перерывы тоже помогают.
+
+## История версий
+
+- **0.3.2** — камера больше не влияет на поиск целей/взаимодействие (компенсация в `ModifyAimRayIfApplicable`); bloom больше не включается принудительно; эффекты с триггерами/столкновениями частиц не затрагиваются.
+- **0.3.1** — пропуск заставок при запуске (с ожиданием конца загрузки).
+- **0.3.0** — первый публичный релиз.
 
 ## Сборка
 
@@ -78,7 +88,7 @@ MIT
 
 A **Risk of Rain 2** mod against motion sickness: it removes or tones down the things that most often cause nausea — camera shake, recoil, FOV bursts, mouse flicks, screen flashes, excess particles and eye-searing colors. Every setting is adjustable in-game.
 
-> Made by a player who gets seriously motion-sick in the late game. Tested on one machine, mostly in early stages. It does not change gameplay or balance, only your own camera and picture (works locally in multiplayer, the host needs nothing).
+> Made by a player who gets seriously motion-sick in the late game. Tested on one machine, mostly in early stages. It does not change gameplay or balance, only your own camera and picture (works locally in multiplayer, the host needs nothing). The game uses the camera position as the origin of some searches (auto-targeting, interaction, equipment targeting, pings); the mod compensates for the moved camera so they behave as in vanilla.
 
 ### Features
 
@@ -91,7 +101,9 @@ A **Risk of Rain 2** mod against motion sickness: it removes or tones down the t
 | **Visuals** (F6) | Damage numbers, hurt flashes, effect particle counts, saturation/contrast/exposure, bloom, depth fog strength |
 | **Master** (F7) | Whole mod on/off. Off = vanilla |
 
-Also hides the "NEW" badge text in menus (it overlaps labels in some localizations) — `HideNewBadges`.
+Also:
+- hides the "NEW" badge text in menus (it overlaps labels in some localizations) — `HideNewBadges`;
+- skips the startup logos and intro video (it waits for the game to finish loading so profiles are read first) — `SkipIntro`.
 
 **Indicator:** toggling flashes the screen **green (on)** or **red (off)** and a `COMFORT ON` / `COMFORT OFF` label stays at the top of the screen (`ShowIndicator`).
 
@@ -102,8 +114,17 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 ### Notes
 
 - Defaults are tuned for one person; adjust to taste. `FogScale` below 1 darkens the scene because the game's fog also lights the distance — raise `Exposure` to compensate.
+- Anything that hides information (`HideDamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Press F7 for a quick with/without comparison.
+- Bloom is never force-enabled: if you turned it off in the game's settings it stays off (`LimitBloom` only caps its intensity).
+- `LookSmoothing` adds a little input lag; set it to 0 for the snappiest aim.
 - Built and checked against game version 1.5.0 (Steam build 25475991).
 - Other mods touching camera / FOV / post-processing may conflict.
+
+### Changelog
+
+- **0.3.2** — camera offset no longer affects targeting/interaction searches; bloom is no longer force-enabled; particle systems with trigger/collision modules are left alone.
+- **0.3.1** — startup splash/intro skip (waits for loading to finish).
+- **0.3.0** — first public release.
 
 ### Build
 
