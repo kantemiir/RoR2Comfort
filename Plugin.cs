@@ -19,23 +19,15 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.4.3";
+        public const string Version = "0.4.4";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
 
-        // Post-process volume (color grading, bloom cap, automatic color balance).
-        private PostProcessVolume volume;
-        private ColorGrading grading;
-        private Bloom bloom;
-        private float nextVolumeCheck;
-        private bool volumeDirty = true;
-        private float vanillaBloom = -1f;
-
-        // Automatic color balance (screen average -> neutralizing color filter).
+        // Automatic color balance (screen average -> neutralizing color filter). The gain is applied on top of the
+        // game's own color grading in Patches.BlendedPost.
         private Vector3 balanceTarget = Vector3.one;
         private Vector3 balanceGain = Vector3.one;
-        private Vector3 appliedGain = Vector3.one;
         private RenderTexture captureRt;
         private int captureFailures;
 
@@ -61,9 +53,9 @@ namespace RoR2Comfort
         {
             Log = Logger;
             Cfg.Bind(Config);
-            Cfg.Changed += () => volumeDirty = true;
 
             harmony = new Harmony(Guid);
+            Patch(typeof(PostProcessManager), "UpdateSettings", post: nameof(Patches.BlendedPost));
             Patch(typeof(ShakeEmitter), nameof(ShakeEmitter.ComputeTotalShakeAtPoint), post: nameof(Patches.ShakePost));
             Patch(typeof(CameraTargetParams), nameof(CameraTargetParams.AddRecoil), pre: nameof(Patches.RecoilPre));
             Patch(typeof(CameraTargetParams), nameof(CameraTargetParams.CalcParams), post: nameof(Patches.CalcParamsPost));
@@ -112,7 +104,6 @@ namespace RoR2Comfort
             flashStart = Time.unscaledTime;
             flashColor = on ? new Color(0.1f, 0.9f, 0.2f) : new Color(0.95f, 0.1f, 0.1f);
             flashText = text;
-            volumeDirty = true;
         }
 
         // ------------------------------------------------------------------ per-frame
@@ -151,24 +142,7 @@ namespace RoR2Comfort
             UpdateCamera();
             DamageNumbers.Flush(Eff.Numbers != DamageNumberMode.Aggregate);
             UpdateBreakReminder(dt);
-
-            if (Time.unscaledTime >= nextVolumeCheck)
-            {
-                nextVolumeCheck = Time.unscaledTime + 1f;
-                if (!volume) TryCreateVolume();
-            }
-            if (volume)
-            {
-                bool changed = false;
-                if (volumeDirty)
-                {
-                    volumeDirty = false;
-                    ApplyVolume();
-                    changed = true;
-                }
-                changed |= ApplyBalance(dt);
-                if (changed) PostProcessVolume.DispatchVolumeSettingsChangedEvent();
-            }
+            UpdateBalance(dt);
         }
 
         private void Group(ConfigEntry<KeyboardShortcut> key, ref bool flag, string label)
@@ -199,11 +173,7 @@ namespace RoR2Comfort
                     k *= Mathf.Lerp(Mathf.Clamp01(Cfg.ProgressiveStart.Value), 1f, t);
                 }
             }
-            if (Mathf.Abs(k - State.Strength) > 0.005f)
-            {
-                State.Strength = k;
-                volumeDirty = true;
-            }
+            State.Strength = k;
         }
 
         private static CameraRigController FindRig()
@@ -244,73 +214,13 @@ namespace RoR2Comfort
             }
         }
 
-        // ------------------------------------------------------------------ post-process volume
+        // ------------------------------------------------------------------ color balance gain
 
-        private void TryCreateVolume()
-        {
-            PostProcessLayer[] layers = FindObjectsOfType<PostProcessLayer>();
-            for (int i = 0; i < layers.Length; i++)
-            {
-                int mask = layers[i].volumeLayer.value;
-                if (mask == 0) continue;
-                int layer = 0;
-                while (((mask >> layer) & 1) == 0) layer++;
-
-                grading = ScriptableObject.CreateInstance<ColorGrading>();
-                bloom = ScriptableObject.CreateInstance<Bloom>();
-
-                volume = PostProcessManager.instance.QuickVolume(layer, 100f, grading, bloom);
-                DontDestroyOnLoad(volume.gameObject);
-                volumeDirty = true;
-                Log.LogInfo("Comfort post-process volume created on layer " + layer);
-                return;
-            }
-        }
-
-        private float GetVanillaBloom()
-        {
-            if (vanillaBloom >= 0f) return vanillaBloom;
-            try
-            {
-                RoR2Application app = RoR2Application.instance;
-                if (app && app.postProcessSettingsController && app.postProcessSettingsController.sharedProfile)
-                {
-                    Bloom b;
-                    if (app.postProcessSettingsController.sharedProfile.TryGetSettings(out b) && b != null)
-                        vanillaBloom = b.intensity.value;
-                }
-            }
-            catch (Exception) { }
-            if (vanillaBloom < 0f) vanillaBloom = 1f;
-            return vanillaBloom;
-        }
-
-        private void ApplyVolume()
-        {
-            float k = State.Strength;
-            volume.weight = State.VisualsOn ? 1f : 0f;
-
-            grading.enabled.Override(true);
-            grading.saturation.Override(Cfg.Saturation.Value * k);
-            grading.contrast.Override(Cfg.Contrast.Value * k);
-            grading.postExposure.Override(Cfg.Exposure.Value * k);
-
-            // Never force bloom on: the game's own switch (pp_bloom) and the scene volumes decide whether it is
-            // enabled. We only cap the intensity when it is.
-            bloom.enabled.overrideState = false;
-            if (Cfg.LimitBloom.Value && k > 0.01f)
-                bloom.intensity.Override(Mathf.Lerp(GetVanillaBloom(), Cfg.BloomIntensity.Value, k));
-            else
-                bloom.intensity.overrideState = false;
-        }
-
-        private bool ApplyBalance(float dt)
+        // Smooths the automatic balance gain; the colour grading itself is adjusted in Patches.BlendedPost.
+        private void UpdateBalance(float dt)
         {
             if (dt > 0f) balanceGain = Vector3.Lerp(balanceGain, balanceTarget, 1f - Mathf.Exp(-dt / 1.5f));
-            if ((balanceGain - appliedGain).sqrMagnitude < 0.00005f) return false;
-            grading.colorFilter.Override(new Color(balanceGain.x, balanceGain.y, balanceGain.z, 1f));
-            appliedGain = balanceGain;
-            return true;
+            Patches.BalanceGain = balanceGain;
         }
 
         // ------------------------------------------------------------------ automatic color balance
