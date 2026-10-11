@@ -19,7 +19,7 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.4.2";
+        public const string Version = "0.4.3";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
