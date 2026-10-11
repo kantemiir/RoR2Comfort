@@ -14,13 +14,12 @@
 | **Тряска и отдача** (F3) | Масштаб тряски экрана; отдача при стрельбе следует за ним (`ShakeScale`) |
 | **FOV** (F4) | Убирает расширение FOV при спринте и от способностей/предметов (`LimitAbilityFov`; тонко — `SprintFovScale`, `AbilityFovMaxIncrease` в файле); приближение (прицелы) не трогает |
 | **Мышь** (F5) | Сглаживание поворота (`LookSmoothing`, сохраняет общий угол), опциональная помощь прицела (`AimStickiness`); ограничитель резких рывков `MaxLookPerFrame` — только в файле |
-| **Картинка** (F6) | Комфортная виньетка, числа урона (суммирование), красная подсветка урона, вспышки, частицы эффектов, насыщенность/контраст/яркость, bloom, туман, автобаланс цвета |
+| **Картинка** (F6) | Числа урона (суммирование), красная подсветка урона, вспышки, частицы эффектов, насыщенность/контраст/яркость, bloom, туман, автобаланс цвета |
 | **Мастер** (F7) | Весь мод вкл/выкл. Выключено = обычная игра |
 | **Сила** (F8) | Переключает общую силу 100% / 70% / 40% (`Strength`) |
 
-### Новое в 0.4.0
+### Новое в 0.4.x
 
-- **Комфортная виньетка:** края экрана затемняются, когда вы быстро бежите или резко поворачиваете камеру (как комфортные режимы в VR). Параметры: `VignetteMax` (0 = выкл) и `VignetteSensitivity`; точные пороги — в файле.
 - **Общая сила и «усиление по стадиям»:** `Strength` смешивает всё с оригиналом; `ProgressiveComfort` постепенно усиливает мод от первой стадии к поздним.
 - **Умный лимит эффектов:** `AdaptiveParticles` — пока спокойно, эффекты как в оригинале; чем больше эффектов в секунду, тем сильнее сокращение до `ParticleCountScale`. Дальние эффекты сокращаются дополнительно, предупреждения о атаках (по названию эффекта) защищены.
 - **Суммирование чисел урона:** `DamageNumbers = Aggregate` — одно суммарное число на цель раз в полсекунды вместо потока.
@@ -58,7 +57,6 @@
 | `ShakeScale` | 0.1 | тряска и отдача: 0 = нет, 1 = как в игре |
 | `SprintFovScale` | 0 | 0 = FOV не расширяется при спринте |
 | `LookSmoothing` | 0.03 с | 0 = выкл |
-| `VignetteMax` / `VignetteSensitivity` | 0.4 / 1 | комфортная виньетка (0 = выкл) |
 | `DamageNumbers` | Aggregate | Show / Aggregate / Hide |
 | `ScreenDamageScale` | 0.3 | красная подсветка урона и полноэкранные вспышки |
 | `ParticleCountScale` / `AdaptiveParticles` | 0.5 / вкл | минимум количества частиц под нагрузкой |
@@ -83,7 +81,8 @@
 
 ## История версий
 
-- **0.4.0** — комфортная виньетка; общая сила (`Strength`, F8) и усиление по стадиям; адаптивный лимит эффектов; суммирование чисел урона; ограничитель вспышек; автобаланс цвета; напоминание о перерыве; опциональная помощь прицела; пакет для Thunderstore.
+- **0.4.1** — убрана комфортная виньетка (затемнение краёв при поворотах мешала); из настроек удалены все её параметры.
+- **0.4.0** — общая сила (`Strength`, F8) и усиление по стадиям; адаптивный лимит эффектов; суммирование чисел урона; ограничитель вспышек; автобаланс цвета; напоминание о перерыве; опциональная помощь прицела; пакет для Thunderstore.
 - **0.3.2** — камера больше не влияет на поиск целей/взаимодействие (компенсация в `ModifyAimRayIfApplicable`); bloom больше не включается принудительно; эффекты с триггерами/столкновениями частиц не затрагиваются.
 - **0.3.1** — пропуск заставок при запуске (с ожиданием конца загрузки).
 - **0.3.0** — первый публичный релиз.
@@ -118,13 +117,12 @@ A **Risk of Rain 2** mod against motion sickness: it removes or tones down the t
 | **Shake & recoil** (F3) | Scale screen shake; firing recoil follows it (`ShakeScale`) |
 | **FOV** (F4) | Removes FOV widening from sprinting and abilities/items (`LimitAbilityFov`; fine-tuning `SprintFovScale`, `AbilityFovMaxIncrease` in the file); zooming in (scopes) is untouched |
 | **Mouse** (F5) | Look smoothing (conserves total turned angle) and optional aim assist (`LookSmoothing`, `AimStickiness`); the flick limiter `MaxLookPerFrame` is file-only |
-| **Visuals** (F6) | Comfort vignette, damage numbers (aggregation), hurt tint, flashes, effect particle counts, saturation/contrast/exposure, bloom, fog, automatic color balance |
+| **Visuals** (F6) | Damage numbers (aggregation), hurt tint, flashes, effect particle counts, saturation/contrast/exposure, bloom, fog, automatic color balance |
 | **Master** (F7) | Whole mod on/off. Off = vanilla |
 | **Strength** (F8) | Cycles overall strength 100% / 70% / 40% (`Strength`) |
 
-### New in 0.4.0
+### New in 0.4.x
 
-- **Comfort vignette:** screen edges darken while you move fast or turn fast (like VR comfort modes).
 - **Overall strength and progressive ramp:** `Strength` blends everything with vanilla; `ProgressiveComfort` ramps the mod up from stage 1 to the late game.
 - **Adaptive effect limit:** vanilla effects while it is calm, scaling down toward `ParticleCountScale` as effects per second grow; far effects are reduced extra; effects named like warnings/telegraphs are protected.
 - **Aggregated damage numbers:** one summed number per target every half second instead of a stream.
@@ -157,7 +155,8 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 
 ### Changelog
 
-- **0.4.0** — comfort vignette; overall strength (`Strength`, F8) and stage ramp; adaptive effect limit; aggregated damage numbers; flash limiter; automatic color balance; break reminder; optional aim assist; Thunderstore package.
+- **0.4.1** — removed the comfort vignette (edge darkening on turns was bothersome); all its settings are gone.
+- **0.4.0** — overall strength (`Strength`, F8) and stage ramp; adaptive effect limit; aggregated damage numbers; flash limiter; automatic color balance; break reminder; optional aim assist; Thunderstore package.
 - **0.3.2** — camera offset no longer affects targeting/interaction searches; bloom is no longer force-enabled; particle systems with trigger/collision modules are left alone.
 - **0.3.1** — startup splash/intro skip (waits for loading to finish).
 - **0.3.0** — first public release.
