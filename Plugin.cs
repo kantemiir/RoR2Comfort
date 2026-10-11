@@ -19,26 +19,18 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.4.0";
+        public const string Version = "0.4.1";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
 
-        // Post-process volume (color grading, bloom cap, comfort vignette).
+        // Post-process volume (color grading, bloom cap, automatic color balance).
         private PostProcessVolume volume;
         private ColorGrading grading;
         private Bloom bloom;
-        private Vignette vignette;
         private float nextVolumeCheck;
         private bool volumeDirty = true;
         private float vanillaBloom = -1f;
-
-        // Comfort vignette driver.
-        private Vector3 lastCamPos;
-        private Quaternion lastCamRot;
-        private bool haveCam;
-        private float motionLevel;
-        private float appliedVignette = -1f;
 
         // Automatic color balance (screen average -> neutralizing color filter).
         private Vector3 balanceTarget = Vector3.one;
@@ -152,11 +144,11 @@ namespace RoR2Comfort
             Group(Cfg.ShakeKey, ref State.Shake, "Shake + recoil");
             Group(Cfg.FovKey, ref State.Fov, "FOV limits");
             Group(Cfg.MouseKey, ref State.Mouse, "Mouse smoothing");
-            Group(Cfg.VisualsKey, ref State.Visuals, "Colors, vignette, flashes, particles, numbers");
+            Group(Cfg.VisualsKey, ref State.Visuals, "Colors, flashes, particles, numbers");
             if (Cfg.StrengthKey.Value.IsDown()) CycleStrength();
 
             UpdateStrength();
-            UpdateCamera(dt);
+            UpdateCamera();
             DamageNumbers.Flush(Eff.Numbers != DamageNumberMode.Aggregate);
             UpdateBreakReminder(dt);
 
@@ -174,7 +166,6 @@ namespace RoR2Comfort
                     ApplyVolume();
                     changed = true;
                 }
-                changed |= ApplyVignette();
                 changed |= ApplyBalance(dt);
                 if (changed) PostProcessVolume.DispatchVolumeSettingsChangedEvent();
             }
@@ -226,49 +217,18 @@ namespace RoR2Comfort
             return null;
         }
 
-        // Tracks the camera for the vignette (speed / turn rate) and for distance-based effect scaling.
-        private void UpdateCamera(float dt)
+        // Tracks the camera position for distance-based effect scaling.
+        private void UpdateCamera()
         {
             CameraRigController rig = FindRig();
             Transform tr = rig ? rig.sceneCam.transform : null;
             if (!tr)
             {
                 Patches.CamPosValid = false;
-                haveCam = false;
-                motionLevel = Mathf.Lerp(motionLevel, 0f, 1f - Mathf.Exp(-dt / 0.3f));
                 return;
             }
-
-            Vector3 pos = tr.position;
-            Quaternion rot = tr.rotation;
-            Patches.CamPos = pos;
+            Patches.CamPos = tr.position;
             Patches.CamPosValid = true;
-
-            float m = 0f;
-            if (haveCam && dt > 0f && Time.timeScale > 0f)
-            {
-                float dist = (pos - lastCamPos).magnitude;
-                if (dist < 40f) // ignore teleports / stage changes
-                {
-                    float speed = dist / dt;
-                    float turn = Quaternion.Angle(lastCamRot, rot) / dt;
-                    float sens = Mathf.Clamp(Cfg.VignetteSensitivity.Value, 0.25f, 4f);
-                    float spStart = Cfg.VignetteSpeedStart.Value / sens;
-                    float spFull = Mathf.Max(spStart + 1f, Cfg.VignetteSpeedFull.Value / sens);
-                    float tuStart = Cfg.VignetteTurnStart.Value / sens;
-                    float tuFull = Mathf.Max(tuStart + 1f, Cfg.VignetteTurnFull.Value / sens);
-                    m = Mathf.Max(Mathf.InverseLerp(spStart, spFull, speed), Mathf.InverseLerp(tuStart, tuFull, turn));
-                }
-            }
-            lastCamPos = pos;
-            lastCamRot = rot;
-            haveCam = true;
-
-            if (dt > 0f)
-            {
-                float tau = m > motionLevel ? 0.08f : 0.6f; // quick attack, slow release
-                motionLevel = Mathf.Lerp(motionLevel, m, 1f - Mathf.Exp(-dt / tau));
-            }
         }
 
         private void UpdateBreakReminder(float dt)
@@ -298,18 +258,10 @@ namespace RoR2Comfort
 
                 grading = ScriptableObject.CreateInstance<ColorGrading>();
                 bloom = ScriptableObject.CreateInstance<Bloom>();
-                vignette = ScriptableObject.CreateInstance<Vignette>();
-                vignette.enabled.Override(true);
-                vignette.color.Override(Color.black);
-                vignette.intensity.Override(0f);
-                vignette.rounded.Override(false);
-                vignette.roundness.Override(1f);
-                vignette.smoothness.Override(Mathf.Clamp(Cfg.VignetteSmoothness.Value, 0.01f, 1f));
 
-                volume = PostProcessManager.instance.QuickVolume(layer, 100f, grading, bloom, vignette);
+                volume = PostProcessManager.instance.QuickVolume(layer, 100f, grading, bloom);
                 DontDestroyOnLoad(volume.gameObject);
                 volumeDirty = true;
-                appliedVignette = -1f;
                 Log.LogInfo("Comfort post-process volume created on layer " + layer);
                 return;
             }
@@ -350,20 +302,6 @@ namespace RoR2Comfort
                 bloom.intensity.Override(Mathf.Lerp(GetVanillaBloom(), Cfg.BloomIntensity.Value, k));
             else
                 bloom.intensity.overrideState = false;
-
-            vignette.smoothness.Override(Mathf.Clamp(Cfg.VignetteSmoothness.Value, 0.01f, 1f));
-            appliedVignette = -1f; // force re-apply of the intensity
-        }
-
-        private bool ApplyVignette()
-        {
-            float target = 0f;
-            if (State.VisualsOn)
-                target = Mathf.Clamp01(Cfg.VignetteMax.Value) * State.Strength * motionLevel;
-            if (Mathf.Abs(target - appliedVignette) < 0.01f && !(target == 0f && appliedVignette != 0f)) return false;
-            vignette.intensity.value = target;
-            appliedVignette = target;
-            return true;
         }
 
         private bool ApplyBalance(float dt)
