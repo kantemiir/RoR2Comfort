@@ -84,14 +84,6 @@ namespace RoR2Comfort
                 T("Slows the mouse while the crosshair is on an enemy.", "Замедляет мышь, пока прицел на враге."));
 
             // ---- Picture & color
-            Slider(Cfg.VignetteMax, picture, 0f, 1f, "{0:0%}",
-                T("Comfort vignette (0 = off)", "Комфортная виньетка (0 = выкл)"),
-                T("Screen edges darken while you move or turn fast. This is the maximum darkness.",
-                  "Края экрана темнеют при быстром беге и поворотах. Это максимальное затемнение."));
-            Slider(Cfg.VignetteSensitivity, picture, 0.25f, 4f, "{0:0.00}",
-                T("Vignette sensitivity", "Чувствительность виньетки"),
-                T("1 = default. Higher = appears at lower speeds.", "1 = по умолчанию. Больше = появляется при меньшей скорости."),
-                () => Cfg.VignetteMax.Value <= 0f);
             Slider(Cfg.Saturation, picture, -100f, 0f, "{0:0}",
                 T("Color saturation", "Насыщенность цвета"),
                 T("0 = like the original, -100 = grayscale.", "0 = как в игре, -100 = чёрно-белое."));
