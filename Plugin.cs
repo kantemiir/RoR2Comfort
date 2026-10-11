@@ -19,7 +19,7 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.4.1";
+        public const string Version = "0.4.2";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
@@ -86,7 +86,7 @@ namespace RoR2Comfort
             }
 
             StartCoroutine(ColorSampler());
-            Flash(true, "COMFORT MOD LOADED");
+            if (Cfg.ShowIndicator.Value) Flash(true, "COMFORT MOD LOADED");
         }
 
         private static void Patch(Type type, string method, string pre = null, string post = null, string finalizer = null)
