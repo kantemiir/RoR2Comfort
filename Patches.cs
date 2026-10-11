@@ -274,6 +274,82 @@ namespace RoR2Comfort
             __instance.TintScale = s;
         }
 
+        // ---------------------------------------------------------------- color grading / bloom
+
+        // Neutralizing gain of the automatic color balance (set by the plugin every frame).
+        public static Vector3 BalanceGain = Vector3.one;
+
+        private static float lastGradingLog = -100f;
+        private static int gradingLogCount;
+        private static string lastGradingLogText = "";
+
+        // Runs once per camera per frame, right after the game's own post-process volumes (shared profile, stage
+        // volumes, hurt tints...) were blended into the camera's settings. The color changes are applied as offsets
+        // ON TOP of that result, so with strength 0 (or the mod off) the picture is exactly the original one.
+        public static void BlendedPost(PostProcessLayer postProcessLayer, Camera camera)
+        {
+            if (!State.VisualsOn || State.Strength <= 0.001f || postProcessLayer == null) return;
+            float k = State.Strength;
+
+            float sat = Cfg.Saturation.Value * k;
+            float con = Cfg.Contrast.Value * k;
+            float exp = Cfg.Exposure.Value * k;
+            Vector3 gain = BalanceGain;
+            bool tint = (gain - Vector3.one).sqrMagnitude > 0.0001f;
+
+            ColorGrading g = postProcessLayer.GetSettings<ColorGrading>();
+            if (g != null)
+            {
+                LogVanillaGrading(g, camera, sat, con, exp);
+                if (sat != 0f || con != 0f || exp != 0f || tint)
+                {
+                    g.enabled.value = true;
+                    g.saturation.value = Mathf.Clamp(g.saturation.value + sat, -100f, 100f);
+                    g.contrast.value = Mathf.Clamp(g.contrast.value + con, -100f, 100f);
+                    g.postExposure.value += exp;
+                    if (tint)
+                    {
+                        Color f = g.colorFilter.value;
+                        g.colorFilter.value = new Color(f.r * gain.x, f.g * gain.y, f.b * gain.z, f.a);
+                    }
+                }
+            }
+
+            // Bloom is never switched on here: the game's own setting decides; we only cap the intensity.
+            if (Cfg.LimitBloom.Value)
+            {
+                Bloom b = postProcessLayer.GetSettings<Bloom>();
+                if (b != null && b.enabled.value)
+                {
+                    float v = b.intensity.value;
+                    float cap = Cfg.BloomIntensity.Value;
+                    if (v > cap) b.intensity.value = Mathf.Lerp(v, cap, k);
+                }
+            }
+        }
+
+        // A few log lines with the game's own grading values (before our offsets), to see what the picture is
+        // based on. Throttled and capped; only written when the values changed.
+        private static void LogVanillaGrading(ColorGrading g, Camera camera, float sat, float con, float exp)
+        {
+            if (gradingLogCount >= 12) return;
+            float now = Time.unscaledTime;
+            if (now - lastGradingLog < 15f) return;
+            Color f = g.colorFilter.value;
+            string text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "enabled={0} mode={1} tonemapper={2} saturation={3:0.##} contrast={4:0.##} postExposure={5:0.##} colorFilter=({6:0.##},{7:0.##},{8:0.##}) temperature={9:0.#} tint={10:0.#}",
+                g.enabled.value, g.gradingMode.value, g.tonemapper.value, g.saturation.value, g.contrast.value,
+                g.postExposure.value, f.r, f.g, f.b, g.temperature.value, g.tint.value);
+            if (text == lastGradingLogText) return;
+            lastGradingLogText = text;
+            lastGradingLog = now;
+            gradingLogCount++;
+            Plugin.Log.LogInfo("Game color grading on '" + (camera ? camera.name : "?") + "': " + text
+                + " | our offsets: saturation " + sat.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
+                + ", contrast " + con.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
+                + ", exposure " + exp.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         // ---------------------------------------------------------------- menus / startup
 
         // Menu "NEW" badge text overlaps long labels in some languages: blank it before it is written to the label.
