@@ -2,20 +2,34 @@
 
 **RU** · [EN below](#english)
 
-Мод для **Risk of Rain 2** против укачивания (motion sickness): убирает или ослабляет то, что чаще всего вызывает тошноту, — тряску камеры, отдачу, резкие скачки FOV, рывки мыши, вспышки на экране, лишние частицы и «вырвиглазные» цвета. Каждая настройка меняется прямо в игре.
+Мод для **Risk of Rain 2** против укачивания (motion sickness): убирает или ослабляет то, что чаще всего вызывает тошноту, — тряску камеры, отдачу, резкие скачки FOV, рывки мыши, вспышки на экране, лишние частицы и «вырвиглазные» однотонные цвета. Каждая настройка меняется прямо в игре (через [Risk of Options](https://thunderstore.io/package/Rune580/Risk_Of_Options/)).
 
-> Сделан человеком, которого сильно укачивает в поздней игре. Проверен на одном компьютере и в основном на ранних стадиях. Мод не меняет геймплей и баланс: только камеру и картинку на вашем экране (в сетевой игре работает локально, хосту ничего не нужно). Игра использует положение камеры для некоторых поисков (самонаведение, взаимодействие, наведение снаряжения, пинг); мод компенсирует сдвиг камеры, чтобы они работали как в оригинале.
+> Сделан человеком, которого сильно укачивает в поздней игре. Проверен на одном компьютере и в основном на ранних стадиях. Мод не меняет геймплей и баланс: только камеру и картинку на вашем экране (в сетевой игре работает локально, хосту ничего не нужно). Игра использует положение камеры для некоторых поисков (самонаведение, взаимодействие, наведение снаряжения, пинг); мод компенсирует сдвиг камеры, чтобы они работали как в оригинале. Единственная функция, которая меняет сложность, — `AimStickiness` (помощь прицела), она выключена по умолчанию.
 
 ## Что делает
 
 | Группа (клавиша) | Что делает |
 |---|---|
 | **Камера** (F2) | Камера дальше и выше от персонажа (`ExtraDistance`, `ExtraHeight`) |
-| **Тряска и отдача** (F3) | Масштаб тряски экрана и отдачи при стрельбе (`ShakeScale`, `RecoilScale`) |
-| **FOV** (F4) | Убирает расширение FOV при спринте и от способностей/предметов (`SprintFovScale`, `LimitAbilityFov`, `AbilityFovMaxIncrease`); приближение (прицелы) не трогает |
-| **Мышь** (F5) | Сглаживание поворота (`LookSmoothing`, сохраняет общий угол) и ограничитель резких рывков (`MaxLookPerFrame`) |
-| **Картинка** (F6) | Числа урона, красные вспышки при уроне, количество частиц эффектов, насыщенность/контраст/яркость, bloom, сила глубинного тумана |
+| **Тряска и отдача** (F3) | Масштаб тряски экрана; отдача при стрельбе следует за ним (`ShakeScale`) |
+| **FOV** (F4) | Убирает расширение FOV при спринте и от способностей/предметов (`LimitAbilityFov`; тонко — `SprintFovScale`, `AbilityFovMaxIncrease` в файле); приближение (прицелы) не трогает |
+| **Мышь** (F5) | Сглаживание поворота (`LookSmoothing`, сохраняет общий угол), опциональная помощь прицела (`AimStickiness`); ограничитель резких рывков `MaxLookPerFrame` — только в файле |
+| **Картинка** (F6) | Комфортная виньетка, числа урона (суммирование), красная подсветка урона, вспышки, частицы эффектов, насыщенность/контраст/яркость, bloom, туман, автобаланс цвета |
 | **Мастер** (F7) | Весь мод вкл/выкл. Выключено = обычная игра |
+| **Сила** (F8) | Переключает общую силу 100% / 70% / 40% (`Strength`) |
+
+### Новое в 0.4.0
+
+- **Комфортная виньетка:** края экрана затемняются, когда вы быстро бежите или резко поворачиваете камеру (как комфортные режимы в VR). Параметры: `VignetteMax` (0 = выкл) и `VignetteSensitivity`; точные пороги — в файле.
+- **Общая сила и «усиление по стадиям»:** `Strength` смешивает всё с оригиналом; `ProgressiveComfort` постепенно усиливает мод от первой стадии к поздним.
+- **Умный лимит эффектов:** `AdaptiveParticles` — пока спокойно, эффекты как в оригинале; чем больше эффектов в секунду, тем сильнее сокращение до `ParticleCountScale`. Дальние эффекты сокращаются дополнительно, предупреждения о атаках (по названию эффекта) защищены.
+- **Суммирование чисел урона:** `DamageNumbers = Aggregate` — одно суммарное число на цель раз в полсекунды вместо потока.
+- **Ограничитель вспышек:** `ScreenDamageScale` ослабляет и красную подсветку урона, и полноэкранные вспышки (грозы, смерть червя, лучи).
+- **Автобаланс цвета:** `AutoColorStrength` (0 = выкл) вытягивает к нейтральному сцены, где почти всё одного цвета (например, «всё красное»); обычные сцены не трогает.
+- **Напоминание о перерыве:** `BreakReminderMinutes` — раз в N минут (по умолчанию выключено).
+- **Упрощённое меню настроек:** 4 раздела (Общее, Камера и мышь, Картинка и цвет, Эффекты и интерфейс), понятные названия (на русском, если система русская). Тонкие параметры помечены `[Advanced]` в файле `BepInEx/config/local.RoR2Comfort.cfg`.
+- **Помощь прицела (по желанию):** `AimStickiness` замедляет мышь, пока прицел на враге. Меняет сложность, выключено.
+- Пакет для Thunderstore (манифест и иконка) в папке `thunderstore/`.
 
 Дополнительно:
 - скрывает текст-бейдж «НОВИНКА/NEW» в меню (в русской локализации он налезает на надписи) — `HideNewBadges`;
@@ -23,7 +37,7 @@
 
 ### Индикатор
 
-При переключении вся картинка на долю секунды вспыхивает **зелёным (вкл)** или **красным (выкл)**, а сверху экрана висит надпись `COMFORT ON` / `COMFORT OFF`. Так сразу видно, работает ли мод, и можно быстро сравнивать «с модом» и «без». Надпись отключается (`ShowIndicator`).
+При переключении вся картинка на долю секунды вспыхивает **зелёным (вкл)** или **красным (выкл)**, а сверху экрана висит надпись `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF`. Так сразу видно, работает ли мод, и можно быстро сравнивать «с модом» и «без». Надпись отключается (`ShowIndicator`).
 
 ## Установка
 
@@ -35,35 +49,41 @@
 
 В игре: *Настройки → вкладка RoR2 Comfort*.
 
-## Настройки по умолчанию
+## Основные настройки по умолчанию
 
 | Параметр | Значение | Смысл |
 |---|---|---|
+| `Strength` | 1 | общая сила: 1 = ваши значения, 0 = оригинал |
 | `ExtraDistance` / `ExtraHeight` | 4 / 1.5 | камера дальше / выше |
-| `ShakeScale` / `RecoilScale` | 0.1 / 0.2 | 0 = нет, 1 = как в игре |
+| `ShakeScale` | 0.1 | тряска и отдача: 0 = нет, 1 = как в игре |
 | `SprintFovScale` | 0 | 0 = FOV не расширяется при спринте |
 | `LookSmoothing` | 0.03 с | 0 = выкл |
-| `HideDamageNumbers` | вкл | |
-| `ScreenDamageScale` | 0.3 | красная вспышка при уроне |
-| `ParticleCountScale` | 0.5 | количество частиц эффектов |
+| `VignetteMax` / `VignetteSensitivity` | 0.4 / 1 | комфортная виньетка (0 = выкл) |
+| `DamageNumbers` | Aggregate | Show / Aggregate / Hide |
+| `ScreenDamageScale` | 0.3 | красная подсветка урона и полноэкранные вспышки |
+| `ParticleCountScale` / `AdaptiveParticles` | 0.5 / вкл | минимум количества частиц под нагрузкой |
 | `Saturation` / `Contrast` / `Exposure` | −25 / 0 / +0.5 | цветокоррекция |
 | `LimitBloom` / `BloomIntensity` | вкл / 0.15 | ограничивает силу bloom; сам bloom мод не включает, если он выключен в настройках игры |
 | `FogScale` | 0.65 | 1 = как в игре; туман ещё и подсвечивает даль, при очень низких значениях сцена темнеет — поднимайте `Exposure` |
-| `HideNewBadges` / `SkipIntro` | вкл / вкл | см. выше |
+| `AutoColorStrength` | 0.6 | автобаланс однотонных сцен (0 = выкл) |
+| `BreakReminderMinutes` | 0 | напоминание о перерыве (0 = выкл) |
+| `AimStickiness` | 0 | помощь прицела, выкл |
 
-Значения подобраны под одного человека; подстраивайте под себя. Всё, что скрывает информацию (`HideDamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`), делает игру менее читаемой — если стало труднее, верните эти значения ближе к оригиналу. Быстрое сравнение «с модом / без»: клавиша F7.
+Значения подобраны под одного человека; подстраивайте под себя. Всё, что скрывает информацию (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`), делает игру менее читаемой — если стало труднее, верните эти значения ближе к оригиналу. Быстрое сравнение «с модом / без»: клавиша F7.
 
 ## Известные ограничения
 
 - Другие моды, которые меняют камеру/FOV/постобработку, могут конфликтовать.
-- Частицы уменьшаются в количестве, а не отключаются полностью, чтобы не терялись предупреждения о атаках врагов.
-- Цвет на поздних стадиях (например, «всё красное») подстраивается только общей цветокоррекцией и туманом; освещение сцены не переписывается.
-- Проверено на сборке игры 1.5.0 (Steam build 25475991). После обновлений игры может потребоваться пересборка.
+- Частицы уменьшаются в количестве, а не отключаются полностью, а эффекты с «telegraph/warning/indicator/charge» в названии не затрагиваются. Это эвристика по имени, она не идеальна.
+- Автобаланс цвета оценивает среднюю картинку экрана 2 раза в секунду и плавно (за секунды) корректирует цвет; он новый и проверялся мало. Если мешает — поставьте `AutoColorStrength` в 0 (или клавишей F6 выключите всю группу «Картинка»).
+- Освещение сцены не переписывается; цвет подстраивается цветокоррекцией, туманом и автобалансом.
 - Сглаживание мыши (`LookSmoothing`) добавляет небольшую задержку прицела; для точной стрельбы можно поставить 0.
+- Проверено на сборке игры 1.5.0 (Steam build 25475991). После обновлений игры может потребоваться пересборка.
 - Если вас укачивает, не полагайтесь только на мод: короткие сессии и перерывы тоже помогают.
 
 ## История версий
 
+- **0.4.0** — комфортная виньетка; общая сила (`Strength`, F8) и усиление по стадиям; адаптивный лимит эффектов; суммирование чисел урона; ограничитель вспышек; автобаланс цвета; напоминание о перерыве; опциональная помощь прицела; пакет для Thunderstore.
 - **0.3.2** — камера больше не влияет на поиск целей/взаимодействие (компенсация в `ModifyAimRayIfApplicable`); bloom больше не включается принудительно; эффекты с триггерами/столкновениями частиц не затрагиваются.
 - **0.3.1** — пропуск заставок при запуске (с ожиданием конца загрузки).
 - **0.3.0** — первый публичный релиз.
@@ -86,26 +106,40 @@ MIT
 
 ## English
 
-A **Risk of Rain 2** mod against motion sickness: it removes or tones down the things that most often cause nausea — camera shake, recoil, FOV bursts, mouse flicks, screen flashes, excess particles and eye-searing colors. Every setting is adjustable in-game.
+A **Risk of Rain 2** mod against motion sickness: it removes or tones down the things that most often cause nausea — camera shake, recoil, FOV bursts, mouse flicks, screen flashes, excess particles and eye-searing one-color scenes. Every setting is adjustable in-game (via [Risk of Options](https://thunderstore.io/package/Rune580/Risk_Of_Options/)).
 
-> Made by a player who gets seriously motion-sick in the late game. Tested on one machine, mostly in early stages. It does not change gameplay or balance, only your own camera and picture (works locally in multiplayer, the host needs nothing). The game uses the camera position as the origin of some searches (auto-targeting, interaction, equipment targeting, pings); the mod compensates for the moved camera so they behave as in vanilla.
+> Made by a player who gets seriously motion-sick in the late game. Tested on one machine, mostly in early stages. It does not change gameplay or balance, only your own camera and picture (works locally in multiplayer, the host needs nothing). The game uses the camera position as the origin of some searches (auto-targeting, interaction, equipment targeting, pings); the mod compensates for the moved camera so they behave as in vanilla. The only feature that changes difficulty is `AimStickiness` (aim assist), which is off by default.
 
 ### Features
 
 | Group (key) | What it does |
 |---|---|
 | **Camera** (F2) | Camera farther and higher (`ExtraDistance`, `ExtraHeight`) |
-| **Shake & recoil** (F3) | Scale screen shake and firing recoil (`ShakeScale`, `RecoilScale`) |
-| **FOV** (F4) | Removes FOV widening from sprinting and abilities/items (`SprintFovScale`, `LimitAbilityFov`, `AbilityFovMaxIncrease`); zooming in (scopes) is untouched |
-| **Mouse** (F5) | Look smoothing (conserves total turned angle) and a flick limiter (`LookSmoothing`, `MaxLookPerFrame`) |
-| **Visuals** (F6) | Damage numbers, hurt flashes, effect particle counts, saturation/contrast/exposure, bloom, depth fog strength |
+| **Shake & recoil** (F3) | Scale screen shake; firing recoil follows it (`ShakeScale`) |
+| **FOV** (F4) | Removes FOV widening from sprinting and abilities/items (`LimitAbilityFov`; fine-tuning `SprintFovScale`, `AbilityFovMaxIncrease` in the file); zooming in (scopes) is untouched |
+| **Mouse** (F5) | Look smoothing (conserves total turned angle) and optional aim assist (`LookSmoothing`, `AimStickiness`); the flick limiter `MaxLookPerFrame` is file-only |
+| **Visuals** (F6) | Comfort vignette, damage numbers (aggregation), hurt tint, flashes, effect particle counts, saturation/contrast/exposure, bloom, fog, automatic color balance |
 | **Master** (F7) | Whole mod on/off. Off = vanilla |
+| **Strength** (F8) | Cycles overall strength 100% / 70% / 40% (`Strength`) |
+
+### New in 0.4.0
+
+- **Comfort vignette:** screen edges darken while you move fast or turn fast (like VR comfort modes).
+- **Overall strength and progressive ramp:** `Strength` blends everything with vanilla; `ProgressiveComfort` ramps the mod up from stage 1 to the late game.
+- **Adaptive effect limit:** vanilla effects while it is calm, scaling down toward `ParticleCountScale` as effects per second grow; far effects are reduced extra; effects named like warnings/telegraphs are protected.
+- **Aggregated damage numbers:** one summed number per target every half second instead of a stream.
+- **Flash limiter:** `ScreenDamageScale` tones down both the red hurt tint and full-screen flashes (storms, worm death, beams).
+- **Automatic color balance:** `AutoColorStrength` (0 = off) pulls overwhelmingly one-colored scenes (e.g. an all-red stage) toward neutral; normal scenes are left alone.
+- **Break reminder:** `BreakReminderMinutes`, every N minutes (off by default).
+- **Simplified settings tab:** 4 categories (General, Camera & mouse, Picture & color, Effects & HUD) with plain names (in Russian on a Russian system). Fine-tuning values are marked `[Advanced]` in `BepInEx/config/local.RoR2Comfort.cfg`.
+- **Optional aim assist:** `AimStickiness` slows the mouse while the crosshair is on an enemy. Changes difficulty; off by default.
+- Thunderstore package (manifest and icon) in `thunderstore/`.
 
 Also:
 - hides the "NEW" badge text in menus (it overlaps labels in some localizations) — `HideNewBadges`;
 - skips the startup logos and intro video (it waits for the game to finish loading so profiles are read first) — `SkipIntro`.
 
-**Indicator:** toggling flashes the screen **green (on)** or **red (off)** and a `COMFORT ON` / `COMFORT OFF` label stays at the top of the screen (`ShowIndicator`).
+**Indicator:** toggling flashes the screen **green (on)** or **red (off)** and a `COMFORT ON` / `COMFORT 70%` / `COMFORT OFF` label stays at the top of the screen (`ShowIndicator`).
 
 ### Install
 
@@ -114,14 +148,16 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 ### Notes
 
 - Defaults are tuned for one person; adjust to taste. `FogScale` below 1 darkens the scene because the game's fog also lights the distance — raise `Exposure` to compensate.
-- Anything that hides information (`HideDamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Press F7 for a quick with/without comparison.
+- Anything that hides information (`DamageNumbers`, `ScreenDamageScale`, `ParticleCountScale`) makes the game less readable; bring those back toward vanilla if it feels harder. Press F7 for a quick with/without comparison.
 - Bloom is never force-enabled: if you turned it off in the game's settings it stays off (`LimitBloom` only caps its intensity).
+- Automatic color balance samples the screen twice a second and corrects slowly; it is new and lightly tested. Set `AutoColorStrength` to 0 if it bothers you.
 - `LookSmoothing` adds a little input lag; set it to 0 for the snappiest aim.
 - Built and checked against game version 1.5.0 (Steam build 25475991).
 - Other mods touching camera / FOV / post-processing may conflict.
 
 ### Changelog
 
+- **0.4.0** — comfort vignette; overall strength (`Strength`, F8) and stage ramp; adaptive effect limit; aggregated damage numbers; flash limiter; automatic color balance; break reminder; optional aim assist; Thunderstore package.
 - **0.3.2** — camera offset no longer affects targeting/interaction searches; bloom is no longer force-enabled; particle systems with trigger/collision modules are left alone.
 - **0.3.1** — startup splash/intro skip (waits for loading to finish).
 - **0.3.0** — first public release.
