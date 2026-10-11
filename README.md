@@ -83,6 +83,7 @@
 
 ## История версий
 
+- **0.4.3** — иконка мода в списке Risk of Options (вместо знака вопроса).
 - **0.4.2** — надпись `COMFORT` сверху и вспышка выключены по умолчанию; все горячие клавиши по умолчанию не назначены (назначаются в файле настроек).
 - **0.4.1** — убрана комфортная виньетка (затемнение краёв при поворотах мешала); из настроек удалены все её параметры.
 - **0.4.0** — общая сила (`Strength`, F8) и усиление по стадиям; адаптивный лимит эффектов; суммирование чисел урона; ограничитель вспышек; автобаланс цвета; напоминание о перерыве; опциональная помощь прицела; пакет для Thunderstore.
@@ -160,6 +161,7 @@ Requires **BepInEx 5** ([RoR2BepInExPack](https://thunderstore.io/package/Riskof
 
 ### Changelog
 
+- **0.4.3** — mod icon in the Risk of Options list (instead of the question mark).
 - **0.4.2** — the on-screen `COMFORT` label and flash are off by default; all hotkeys are unassigned by default (assign them in the config file).
 - **0.4.1** — removed the comfort vignette (edge darkening on turns was bothersome); all its settings are gone.
 - **0.4.0** — overall strength (`Strength`, F8) and stage ramp; adaptive effect limit; aggregated damage numbers; flash limiter; automatic color balance; break reminder; optional aim assist; Thunderstore package.
