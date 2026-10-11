@@ -1,7 +1,6 @@
 using System;
-using System.Collections.Generic;
+using System.Collections;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -20,22 +19,51 @@ namespace RoR2Comfort
     {
         public const string Guid = "local.RoR2Comfort";
         public const string Name = "RoR2 Comfort";
-        public const string Version = "0.3.2";
+        public const string Version = "0.4.0";
 
         internal static ManualLogSource Log;
         private static Harmony harmony;
 
+        // Post-process volume (color grading, bloom cap, comfort vignette).
         private PostProcessVolume volume;
         private ColorGrading grading;
         private Bloom bloom;
+        private Vignette vignette;
         private float nextVolumeCheck;
         private bool volumeDirty = true;
+        private float vanillaBloom = -1f;
+
+        // Comfort vignette driver.
+        private Vector3 lastCamPos;
+        private Quaternion lastCamRot;
+        private bool haveCam;
+        private float motionLevel;
+        private float appliedVignette = -1f;
+
+        // Automatic color balance (screen average -> neutralizing color filter).
+        private Vector3 balanceTarget = Vector3.one;
+        private Vector3 balanceGain = Vector3.one;
+        private Vector3 appliedGain = Vector3.one;
+        private RenderTexture captureRt;
+        private int captureFailures;
 
         // Indicator (same idea as the Abyssus mod: green/red flash on toggle + small permanent label).
         private float flashStart = -10f;
         private Color flashColor = Color.green;
         private string flashText = "";
-        private GUIStyle labelStyle, shadowStyle, bigStyle;
+        private GUIStyle labelStyle, shadowStyle, bigStyle, bannerStyle;
+        private string indicatorText = "COMFORT ON";
+        private int indicatorPct = -1;
+        private bool indicatorMaster = true;
+
+        // Break reminder.
+        private float playSeconds;
+        private float breakBannerUntil;
+        private int breakBannerMinutes;
+        private int breakBannerTextMinutes = -1;
+        private string breakBannerText;
+
+        private float nextErrorLog;
 
         private void Awake()
         {
@@ -49,12 +77,13 @@ namespace RoR2Comfort
             Patch(typeof(CameraTargetParams), nameof(CameraTargetParams.CalcParams), post: nameof(Patches.CalcParamsPost));
             Patch(typeof(CameraModePlayerBasic), "UpdateInternal", post: nameof(Patches.CameraUpdatePost));
             Patch(typeof(CameraModePlayerBasic), "CollectLookInputInternal", post: nameof(Patches.LookInputPost));
+            Patch(typeof(CameraRigController), nameof(CameraRigController.ModifyAimRayIfApplicable), post: nameof(Patches.AimRayPost));
             Patch(typeof(DamageNumberManager), nameof(DamageNumberManager.SpawnDamageNumber), pre: nameof(Patches.DamageNumberPre));
             Patch(typeof(ScreenDamage), "Update", pre: nameof(Patches.ScreenDamagePre));
+            Patch(typeof(PostProcessDuration), "UpdatePostProccess", post: nameof(Patches.FlashPost));
             Patch(typeof(EffectComponent), nameof(EffectComponent.Reset), post: nameof(Patches.EffectResetPost));
-            Patch(typeof(RampFogRenderer), "Render", pre: nameof(Patches.FogPre), post: nameof(Patches.FogPost));
+            Patch(typeof(RampFogRenderer), "Render", pre: nameof(Patches.FogPre), finalizer: nameof(Patches.FogFinalizer));
             Patch(typeof(RoR2.UI.LanguageTextMeshController), "UpdateLabel", pre: nameof(Patches.NewBadgePre));
-            Patch(typeof(CameraRigController), nameof(CameraRigController.ModifyAimRayIfApplicable), post: nameof(Patches.AimRayPost));
             Patch(typeof(SplashScreenController), "Start", pre: nameof(Patches.SplashStartPre));
             Patch(typeof(SplashScreenController), "Finish", pre: nameof(Patches.SplashFinishPre));
 
@@ -64,10 +93,11 @@ namespace RoR2Comfort
                 catch (Exception e) { Log.LogWarning("Risk of Options UI not registered: " + e.Message); }
             }
 
+            StartCoroutine(ColorSampler());
             Flash(true, "COMFORT MOD LOADED");
         }
 
-        private static void Patch(Type type, string method, string pre = null, string post = null)
+        private static void Patch(Type type, string method, string pre = null, string post = null, string finalizer = null)
         {
             try
             {
@@ -75,7 +105,8 @@ namespace RoR2Comfort
                 if (target == null) { Log.LogError("Patch target not found: " + type.Name + "." + method); return; }
                 harmony.Patch(target,
                     prefix: pre != null ? new HarmonyMethod(typeof(Patches), pre) : null,
-                    postfix: post != null ? new HarmonyMethod(typeof(Patches), post) : null);
+                    postfix: post != null ? new HarmonyMethod(typeof(Patches), post) : null,
+                    finalizer: finalizer != null ? new HarmonyMethod(typeof(Patches), finalizer) : null);
                 Log.LogInfo("Patched " + type.Name + "." + method);
             }
             catch (Exception e)
@@ -92,8 +123,26 @@ namespace RoR2Comfort
             volumeDirty = true;
         }
 
+        // ------------------------------------------------------------------ per-frame
+
         private void Update()
         {
+            try { UpdateInner(); }
+            catch (Exception e)
+            {
+                if (Time.unscaledTime >= nextErrorLog)
+                {
+                    nextErrorLog = Time.unscaledTime + 10f;
+                    Log.LogError("Update error (will keep running): " + e);
+                }
+            }
+        }
+
+        private void UpdateInner()
+        {
+            float dt = Time.unscaledDeltaTime;
+
+            // hotkeys
             if (Cfg.MasterKey.Value.IsDown())
             {
                 State.Master = !State.Master;
@@ -103,17 +152,31 @@ namespace RoR2Comfort
             Group(Cfg.ShakeKey, ref State.Shake, "Shake + recoil");
             Group(Cfg.FovKey, ref State.Fov, "FOV limits");
             Group(Cfg.MouseKey, ref State.Mouse, "Mouse smoothing");
-            Group(Cfg.VisualsKey, ref State.Visuals, "Colors, flashes, particles, numbers");
+            Group(Cfg.VisualsKey, ref State.Visuals, "Colors, vignette, flashes, particles, numbers");
+            if (Cfg.StrengthKey.Value.IsDown()) CycleStrength();
+
+            UpdateStrength();
+            UpdateCamera(dt);
+            DamageNumbers.Flush(Eff.Numbers != DamageNumberMode.Aggregate);
+            UpdateBreakReminder(dt);
 
             if (Time.unscaledTime >= nextVolumeCheck)
             {
                 nextVolumeCheck = Time.unscaledTime + 1f;
                 if (!volume) TryCreateVolume();
             }
-            if (volume && volumeDirty)
+            if (volume)
             {
-                volumeDirty = false;
-                ApplyVolume();
+                bool changed = false;
+                if (volumeDirty)
+                {
+                    volumeDirty = false;
+                    ApplyVolume();
+                    changed = true;
+                }
+                changed |= ApplyVignette();
+                changed |= ApplyBalance(dt);
+                if (changed) PostProcessVolume.DispatchVolumeSettingsChangedEvent();
             }
         }
 
@@ -124,13 +187,347 @@ namespace RoR2Comfort
             Flash(flag, label + (flag ? ": ON" : ": OFF"));
         }
 
+        private void CycleStrength()
+        {
+            float cur = Cfg.Strength.Value;
+            float next = cur > 0.85f ? 0.7f : (cur > 0.55f ? 0.4f : 1f);
+            Cfg.Strength.Value = next;
+            Flash(true, "Comfort strength " + Mathf.RoundToInt(next * 100f) + "%");
+        }
+
+        private void UpdateStrength()
+        {
+            float k = Mathf.Clamp01(Cfg.Strength.Value);
+            if (Cfg.Progressive.Value)
+            {
+                Run run = Run.instance;
+                if (run)
+                {
+                    int full = Mathf.Max(2, Cfg.ProgressiveFullAt.Value);
+                    float t = Mathf.Clamp01(run.stageClearCount / (float)(full - 1));
+                    k *= Mathf.Lerp(Mathf.Clamp01(Cfg.ProgressiveStart.Value), 1f, t);
+                }
+            }
+            if (Mathf.Abs(k - State.Strength) > 0.005f)
+            {
+                State.Strength = k;
+                volumeDirty = true;
+            }
+        }
+
+        private static CameraRigController FindRig()
+        {
+            var list = CameraRigController.readOnlyInstancesList;
+            for (int i = 0; i < list.Count; i++)
+            {
+                CameraRigController r = list[i];
+                if (r && r.sceneCam && r.localUserViewer != null && r.target) return r;
+            }
+            return null;
+        }
+
+        // Tracks the camera for the vignette (speed / turn rate) and for distance-based effect scaling.
+        private void UpdateCamera(float dt)
+        {
+            CameraRigController rig = FindRig();
+            Transform tr = rig ? rig.sceneCam.transform : null;
+            if (!tr)
+            {
+                Patches.CamPosValid = false;
+                haveCam = false;
+                motionLevel = Mathf.Lerp(motionLevel, 0f, 1f - Mathf.Exp(-dt / 0.3f));
+                return;
+            }
+
+            Vector3 pos = tr.position;
+            Quaternion rot = tr.rotation;
+            Patches.CamPos = pos;
+            Patches.CamPosValid = true;
+
+            float m = 0f;
+            if (haveCam && dt > 0f && Time.timeScale > 0f)
+            {
+                float dist = (pos - lastCamPos).magnitude;
+                if (dist < 40f) // ignore teleports / stage changes
+                {
+                    float speed = dist / dt;
+                    float turn = Quaternion.Angle(lastCamRot, rot) / dt;
+                    float sens = Mathf.Clamp(Cfg.VignetteSensitivity.Value, 0.25f, 4f);
+                    float spStart = Cfg.VignetteSpeedStart.Value / sens;
+                    float spFull = Mathf.Max(spStart + 1f, Cfg.VignetteSpeedFull.Value / sens);
+                    float tuStart = Cfg.VignetteTurnStart.Value / sens;
+                    float tuFull = Mathf.Max(tuStart + 1f, Cfg.VignetteTurnFull.Value / sens);
+                    m = Mathf.Max(Mathf.InverseLerp(spStart, spFull, speed), Mathf.InverseLerp(tuStart, tuFull, turn));
+                }
+            }
+            lastCamPos = pos;
+            lastCamRot = rot;
+            haveCam = true;
+
+            if (dt > 0f)
+            {
+                float tau = m > motionLevel ? 0.08f : 0.6f; // quick attack, slow release
+                motionLevel = Mathf.Lerp(motionLevel, m, 1f - Mathf.Exp(-dt / tau));
+            }
+        }
+
+        private void UpdateBreakReminder(float dt)
+        {
+            int minutes = Cfg.BreakMinutes.Value;
+            if (minutes <= 0 || !Application.isFocused) return;
+            playSeconds += dt;
+            if (playSeconds >= minutes * 60f)
+            {
+                playSeconds = 0f;
+                breakBannerUntil = Time.unscaledTime + 9f;
+                breakBannerMinutes = minutes;
+            }
+        }
+
+        // ------------------------------------------------------------------ post-process volume
+
+        private void TryCreateVolume()
+        {
+            PostProcessLayer[] layers = FindObjectsOfType<PostProcessLayer>();
+            for (int i = 0; i < layers.Length; i++)
+            {
+                int mask = layers[i].volumeLayer.value;
+                if (mask == 0) continue;
+                int layer = 0;
+                while (((mask >> layer) & 1) == 0) layer++;
+
+                grading = ScriptableObject.CreateInstance<ColorGrading>();
+                bloom = ScriptableObject.CreateInstance<Bloom>();
+                vignette = ScriptableObject.CreateInstance<Vignette>();
+                vignette.enabled.Override(true);
+                vignette.color.Override(Color.black);
+                vignette.intensity.Override(0f);
+                vignette.rounded.Override(false);
+                vignette.roundness.Override(1f);
+                vignette.smoothness.Override(Mathf.Clamp(Cfg.VignetteSmoothness.Value, 0.01f, 1f));
+
+                volume = PostProcessManager.instance.QuickVolume(layer, 100f, grading, bloom, vignette);
+                DontDestroyOnLoad(volume.gameObject);
+                volumeDirty = true;
+                appliedVignette = -1f;
+                Log.LogInfo("Comfort post-process volume created on layer " + layer);
+                return;
+            }
+        }
+
+        private float GetVanillaBloom()
+        {
+            if (vanillaBloom >= 0f) return vanillaBloom;
+            try
+            {
+                RoR2Application app = RoR2Application.instance;
+                if (app && app.postProcessSettingsController && app.postProcessSettingsController.sharedProfile)
+                {
+                    Bloom b;
+                    if (app.postProcessSettingsController.sharedProfile.TryGetSettings(out b) && b != null)
+                        vanillaBloom = b.intensity.value;
+                }
+            }
+            catch (Exception) { }
+            if (vanillaBloom < 0f) vanillaBloom = 1f;
+            return vanillaBloom;
+        }
+
+        private void ApplyVolume()
+        {
+            float k = State.Strength;
+            volume.weight = State.VisualsOn ? 1f : 0f;
+
+            grading.enabled.Override(true);
+            grading.saturation.Override(Cfg.Saturation.Value * k);
+            grading.contrast.Override(Cfg.Contrast.Value * k);
+            grading.postExposure.Override(Cfg.Exposure.Value * k);
+
+            // Never force bloom on: the game's own switch (pp_bloom) and the scene volumes decide whether it is
+            // enabled. We only cap the intensity when it is.
+            bloom.enabled.overrideState = false;
+            if (Cfg.LimitBloom.Value && k > 0.01f)
+                bloom.intensity.Override(Mathf.Lerp(GetVanillaBloom(), Cfg.BloomIntensity.Value, k));
+            else
+                bloom.intensity.overrideState = false;
+
+            vignette.smoothness.Override(Mathf.Clamp(Cfg.VignetteSmoothness.Value, 0.01f, 1f));
+            appliedVignette = -1f; // force re-apply of the intensity
+        }
+
+        private bool ApplyVignette()
+        {
+            float target = 0f;
+            if (State.VisualsOn)
+                target = Mathf.Clamp01(Cfg.VignetteMax.Value) * State.Strength * motionLevel;
+            if (Mathf.Abs(target - appliedVignette) < 0.01f && !(target == 0f && appliedVignette != 0f)) return false;
+            vignette.intensity.value = target;
+            appliedVignette = target;
+            return true;
+        }
+
+        private bool ApplyBalance(float dt)
+        {
+            if (dt > 0f) balanceGain = Vector3.Lerp(balanceGain, balanceTarget, 1f - Mathf.Exp(-dt / 1.5f));
+            if ((balanceGain - appliedGain).sqrMagnitude < 0.00005f) return false;
+            grading.colorFilter.Override(new Color(balanceGain.x, balanceGain.y, balanceGain.z, 1f));
+            appliedGain = balanceGain;
+            return true;
+        }
+
+        // ------------------------------------------------------------------ automatic color balance
+
+        private IEnumerator ColorSampler()
+        {
+            WaitForSecondsRealtime wait = new WaitForSecondsRealtime(0.5f);
+            WaitForEndOfFrame endOfFrame = new WaitForEndOfFrame();
+            while (true)
+            {
+                yield return wait;
+                if (Cfg.AutoColorStrength.Value <= 0.01f || !State.VisualsOn || State.Strength < 0.05f || Screen.width < 64)
+                {
+                    balanceTarget = Vector3.one;
+                    continue;
+                }
+                yield return endOfFrame;
+                try
+                {
+                    CaptureFrame();
+                }
+                catch (Exception e)
+                {
+                    captureFailures++;
+                    Log.LogWarning("Auto color balance capture failed (" + captureFailures + "): " + e.Message);
+                    if (captureFailures >= 3)
+                    {
+                        Log.LogWarning("Auto color balance disabled for this session.");
+                        balanceTarget = Vector3.one;
+                        yield break;
+                    }
+                }
+            }
+        }
+
+        private void CaptureFrame()
+        {
+            int w = Screen.width, h = Screen.height;
+            if (captureRt == null || captureRt.width != w || captureRt.height != h)
+            {
+                if (captureRt != null) { captureRt.Release(); Destroy(captureRt); }
+                captureRt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32);
+            }
+            ScreenCapture.CaptureScreenshotIntoRenderTexture(captureRt);
+
+            // Halve repeatedly down to 16x9 so the average is not aliased.
+            RenderTexture src = captureRt;
+            int cw = w, ch = h;
+            while (cw > 16)
+            {
+                cw = Mathf.Max(16, cw / 2);
+                ch = Mathf.Max(9, ch / 2);
+                RenderTexture t = RenderTexture.GetTemporary(cw, ch, 0, RenderTextureFormat.ARGB32);
+                Graphics.Blit(src, t);
+                if (src != captureRt) RenderTexture.ReleaseTemporary(src);
+                src = t;
+            }
+
+            RenderTexture final = src;
+            bool temporary = final != captureRt;
+            UnityEngine.Rendering.AsyncGPUReadback.Request(final, 0, TextureFormat.RGBA32, req =>
+            {
+                try { OnReadback(req); }
+                finally { if (temporary) RenderTexture.ReleaseTemporary(final); }
+            });
+        }
+
+        private void OnReadback(UnityEngine.Rendering.AsyncGPUReadbackRequest req)
+        {
+            if (req.hasError) return;
+            Unity.Collections.NativeArray<Color32> data = req.GetData<Color32>();
+            int n = data.Length;
+            if (n == 0) return;
+
+            float r = 0f, g = 0f, b = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                r += data[i].r; g += data[i].g; b += data[i].b;
+            }
+            float inv = 1f / (n * 255f);
+            UpdateBalanceTarget(r * inv, g * inv, b * inv);
+        }
+
+        // Closed loop on the final image: if one hue dominates more than allowed, nudge the neutralizing gains;
+        // otherwise let them relax back to 1.
+        private void UpdateBalanceTarget(float r, float g, float b)
+        {
+            float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+            if (lum < 0.03f) return; // black screen / loading
+
+            Vector3 d = new Vector3(r / lum, g / lum, b / lum);
+            float dominance = Mathf.Max(d.x, Mathf.Max(d.y, d.z)) - Mathf.Min(d.x, Mathf.Min(d.y, d.z));
+
+            float strength = Mathf.Clamp01(Cfg.AutoColorStrength.Value) * State.Strength;
+            float allowed = Mathf.Lerp(1.4f, 0.4f, strength);
+
+            Vector3 t = balanceTarget;
+            if (dominance > allowed)
+            {
+                float push = Mathf.Clamp01((dominance - allowed) / 0.5f);
+                float e = 0.3f * push;
+                t.x *= Mathf.Pow(1f / Mathf.Clamp(d.x, 0.2f, 3f), e);
+                t.y *= Mathf.Pow(1f / Mathf.Clamp(d.y, 0.2f, 3f), e);
+                t.z *= Mathf.Pow(1f / Mathf.Clamp(d.z, 0.2f, 3f), e);
+            }
+            else
+            {
+                t = Vector3.Lerp(t, Vector3.one, 0.08f);
+            }
+
+            // keep overall brightness, limit the range
+            float tl = 0.299f * t.x + 0.587f * t.y + 0.114f * t.z;
+            if (tl > 0.01f) t /= tl;
+            t.x = Mathf.Clamp(t.x, 0.65f, 1.45f);
+            t.y = Mathf.Clamp(t.y, 0.65f, 1.45f);
+            t.z = Mathf.Clamp(t.z, 0.65f, 1.45f);
+            balanceTarget = t;
+        }
+
+        // ------------------------------------------------------------------ on-screen indicator
+
+        private string GetIndicatorText()
+        {
+            int pct = Mathf.RoundToInt(State.Strength * 100f);
+            if (pct != indicatorPct || State.Master != indicatorMaster)
+            {
+                indicatorPct = pct;
+                indicatorMaster = State.Master;
+                if (!State.Master) indicatorText = "COMFORT OFF";
+                else indicatorText = pct >= 99 ? "COMFORT ON" : "COMFORT " + pct + "%";
+            }
+            return indicatorText;
+        }
+
+        private void OnDestroy()
+        {
+            if (captureRt != null)
+            {
+                captureRt.Release();
+                Destroy(captureRt);
+                captureRt = null;
+            }
+        }
+
         private void OnGUI()
         {
+            // IMGUI runs several event passes per frame; drawing is only needed on Repaint.
+            if (Event.current.type != EventType.Repaint) return;
+
             if (labelStyle == null)
             {
                 labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperCenter };
                 shadowStyle = new GUIStyle(labelStyle);
                 bigStyle = new GUIStyle(GUI.skin.label) { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                bannerStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperCenter };
             }
 
             float t = Time.unscaledTime - flashStart;
@@ -147,7 +544,7 @@ namespace RoR2Comfort
 
             if (Cfg.ShowIndicator.Value)
             {
-                string text = State.Master ? "COMFORT ON" : "COMFORT OFF";
+                string text = GetIndicatorText();
                 Color c = State.Master ? new Color(0.3f, 1f, 0.4f, 0.9f) : new Color(1f, 0.3f, 0.3f, 0.9f);
                 Rect r = new Rect(Screen.width * 0.5f - 100f, 4f, 200f, 24f);
                 Color old = GUI.color;
@@ -157,409 +554,23 @@ namespace RoR2Comfort
                 GUI.Label(r, text, labelStyle);
                 GUI.color = old;
             }
-        }
 
-        private void TryCreateVolume()
-        {
-            PostProcessLayer[] layers = FindObjectsOfType<PostProcessLayer>();
-            for (int i = 0; i < layers.Length; i++)
+            if (Time.unscaledTime < breakBannerUntil)
             {
-                int mask = layers[i].volumeLayer.value;
-                if (mask == 0) continue;
-                int layer = 0;
-                while (((mask >> layer) & 1) == 0) layer++;
-
-                grading = ScriptableObject.CreateInstance<ColorGrading>();
-                bloom = ScriptableObject.CreateInstance<Bloom>();
-                volume = PostProcessManager.instance.QuickVolume(layer, 100f, grading, bloom);
-                DontDestroyOnLoad(volume.gameObject);
-                volumeDirty = true;
-                Log.LogInfo("Comfort post-process volume created on layer " + layer);
-                return;
-            }
-        }
-
-        private void ApplyVolume()
-        {
-            volume.weight = State.VisualsOn ? 1f : 0f;
-
-            grading.enabled.Override(true);
-            grading.saturation.Override(Cfg.Saturation.Value);
-            grading.contrast.Override(Cfg.Contrast.Value);
-            grading.postExposure.Override(Cfg.Exposure.Value);
-
-            // Never force bloom on: the game's own switch (pp_bloom) and the scene volumes decide whether it is
-            // enabled. We only cap the intensity when it is.
-            bloom.enabled.overrideState = false;
-            if (Cfg.LimitBloom.Value) bloom.intensity.Override(Cfg.BloomIntensity.Value);
-            else bloom.intensity.overrideState = false;
-        }
-    }
-
-    // Runtime on/off switches (hotkeys). Master off = fully vanilla behaviour.
-    internal static class State
-    {
-        public static bool Master = true;
-        public static bool Camera = true, Shake = true, Fov = true, Mouse = true, Visuals = true;
-
-        public static bool CameraOn { get { return Master && Camera; } }
-        public static bool ShakeOn { get { return Master && Shake; } }
-        public static bool FovOn { get { return Master && Fov; } }
-        public static bool MouseOn { get { return Master && Mouse; } }
-        public static bool VisualsOn { get { return Master && Visuals; } }
-    }
-
-    internal static class Cfg
-    {
-        public static event Action Changed;
-
-        public static ConfigEntry<float> ExtraDistance, ExtraHeight;
-        public static ConfigEntry<float> ShakeScale, RecoilScale;
-        public static ConfigEntry<float> SprintFovScale, AbilityFovMaxIncrease;
-        public static ConfigEntry<bool> LimitAbilityFov;
-        public static ConfigEntry<float> LookSmoothing, MaxLookPerFrame;
-        public static ConfigEntry<bool> HideDamageNumbers;
-        public static ConfigEntry<float> ScreenDamageScale, ParticleCountScale;
-        public static ConfigEntry<float> Saturation, Contrast, Exposure, BloomIntensity, FogScale;
-        public static ConfigEntry<bool> LimitBloom;
-        public static ConfigEntry<bool> ShowIndicator, HideNewBadges, SkipIntro;
-        public static ConfigEntry<KeyboardShortcut> MasterKey, CameraKey, ShakeKey, FovKey, MouseKey, VisualsKey;
-
-        public static void Bind(ConfigFile c)
-        {
-            ExtraDistance = c.Bind("Camera", "ExtraDistance", 4f, "How much farther the camera sits behind the character (added to the game's value).");
-            ExtraHeight = c.Bind("Camera", "ExtraHeight", 1.5f, "How much higher the camera sits above the character.");
-
-            ShakeScale = c.Bind("Shake", "ShakeScale", 0.1f, "Camera shake strength: 0 = none, 1 = vanilla.");
-            RecoilScale = c.Bind("Shake", "RecoilScale", 0.2f, "Camera kick when firing: 0 = none, 1 = vanilla.");
-
-            SprintFovScale = c.Bind("Fov", "SprintFovScale", 0f, "How much of the sprint FOV widening to keep: 0 = none, 1 = vanilla.");
-            LimitAbilityFov = c.Bind("Fov", "LimitAbilityFov", true, "Stop abilities and items from widening FOV past the limit below (zooming in, e.g. scopes, is untouched).");
-            AbilityFovMaxIncrease = c.Bind("Fov", "AbilityFovMaxIncrease", 0f, "Max FOV widening in degrees allowed by abilities when the limit is on.");
-
-            LookSmoothing = c.Bind("Mouse", "LookSmoothing", 0.03f, "Mouse look smoothing time in seconds. 0 = off. Higher = smoother but more input lag.");
-            MaxLookPerFrame = c.Bind("Mouse", "MaxLookPerFrame", 0f, "Max camera turn per frame in degrees (limits sudden flicks). 0 = off.");
-
-            HideDamageNumbers = c.Bind("Hud", "HideDamageNumbers", true, "Hide floating damage numbers.");
-            ScreenDamageScale = c.Bind("Hud", "ScreenDamageScale", 0.3f, "Strength of red tint / desaturation / distortion when hurt: 0 = none, 1 = vanilla.");
-
-            ParticleCountScale = c.Bind("Effects", "ParticleCountScale", 0.5f, "Scale for particle emission of spawned effects: 1 = vanilla, lower = fewer particles.");
-
-            Saturation = c.Bind("Color", "Saturation", -25f, "Color saturation adjustment (-100 grey .. 0 vanilla).");
-            Contrast = c.Bind("Color", "Contrast", 0f, "Contrast adjustment (negative = flatter/hazier, 0 = vanilla, positive = punchier).");
-            Exposure = c.Bind("Color", "Exposure", 0.5f, "Brightness in EV stops (negative = darker, positive = brighter).");
-            FogScale = c.Bind("Color", "FogScale", 0.65f, "Strength of the game's depth fog / haze: 1 = vanilla. Note: the fog also lights up the distance, so very low values make the scene dark - raise Exposure to compensate.");
-            LimitBloom = c.Bind("Color", "LimitBloom", true, "Override bloom (glow) intensity with the value below.");
-            BloomIntensity = c.Bind("Color", "BloomIntensity", 0.15f, "Bloom intensity used when LimitBloom is on.");
-
-            HideNewBadges = c.Bind("Hud", "HideNewBadges", true, "Hide the \"NEW\" (НОВИНКА) badge text in menus; in some languages it overlaps the labels.");
-            SkipIntro = c.Bind("Startup", "SkipIntro", true, "Skip the startup splash screens and the intro cutscene video and go straight to the title screen. Applies on the next game start.");
-            ShowIndicator = c.Bind("Indicator", "ShowIndicator", true, "Show a small COMFORT ON/OFF label at the top of the screen. Toggling always flashes the screen green/red.");
-            MasterKey = c.Bind("Hotkeys", "MasterToggle", new KeyboardShortcut(KeyCode.F7), "Mod on/off (green/red flash). Off = fully vanilla.");
-            CameraKey = c.Bind("Hotkeys", "CameraToggle", new KeyboardShortcut(KeyCode.F2), "Toggle camera distance/height.");
-            ShakeKey = c.Bind("Hotkeys", "ShakeToggle", new KeyboardShortcut(KeyCode.F3), "Toggle shake and recoil reduction.");
-            FovKey = c.Bind("Hotkeys", "FovToggle", new KeyboardShortcut(KeyCode.F4), "Toggle FOV limits.");
-            MouseKey = c.Bind("Hotkeys", "MouseToggle", new KeyboardShortcut(KeyCode.F5), "Toggle mouse smoothing.");
-            VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.F6), "Toggle colors, bloom, hurt flashes, particles and damage numbers.");
-
-            c.SettingChanged += (s, a) => Changed?.Invoke();
-        }
-    }
-
-    internal static class Patches
-    {
-        // Camera shake: scale the displacement the camera receives.
-        public static void ShakePost(ref Vector3 __result)
-        {
-            if (!State.ShakeOn) return;
-            __result *= Cfg.ShakeScale.Value;
-        }
-
-        // Recoil kick when firing.
-        public static void RecoilPre(ref float verticalMin, ref float verticalMax, ref float horizontalMin, ref float horizontalMax)
-        {
-            if (!State.ShakeOn) return;
-            float s = Cfg.RecoilScale.Value;
-            verticalMin *= s; verticalMax *= s; horizontalMin *= s; horizontalMax *= s;
-        }
-
-        // Camera position (farther/higher) and ability FOV limit.
-        public static void CalcParamsPost(CameraTargetParams __instance, ref CharacterCameraParamsData dest)
-        {
-            if (State.CameraOn)
-                dest.idealLocalCameraPos.value += new Vector3(0f, Cfg.ExtraHeight.Value, -Cfg.ExtraDistance.Value);
-
-            if (State.FovOn && Cfg.LimitAbilityFov.Value)
-            {
-                // Characters that don't set their own FOV have value 0 with alpha 0 (= "don't override"),
-                // so only trust the value when the override is actually active.
-                float baseFov = CharacterCameraParamsData.basic.fov.value;
-                if (__instance.cameraParams)
+                if (breakBannerText == null || breakBannerTextMinutes != breakBannerMinutes)
                 {
-                    CharacterCameraParamsData own = __instance.cameraParams.data;
-                    if (own.fov.alpha > 0f && own.fov.value >= 30f) baseFov = own.fov.value;
+                    breakBannerTextMinutes = breakBannerMinutes;
+                    breakBannerText = "BREAK TIME? " + breakBannerMinutes + " min of play. Rest your eyes for a few minutes.";
                 }
-                float cap = Mathf.Max(30f, baseFov + Cfg.AbilityFovMaxIncrease.Value);
-                if (dest.fov.value > cap) dest.fov.value = cap;
+                string msg = breakBannerText;
+                Rect r = new Rect(Screen.width * 0.5f - 300f, 34f, 600f, 28f);
+                Color old = GUI.color;
+                GUI.color = new Color(0f, 0f, 0f, 0.85f);
+                GUI.Label(new Rect(r.x + 1f, r.y + 1f, r.width, r.height), msg, bannerStyle);
+                GUI.color = new Color(1f, 0.9f, 0.4f, 1f);
+                GUI.Label(r, msg, bannerStyle);
+                GUI.color = old;
             }
-        }
-
-        // Keep gameplay independent of how far the camera is pulled back.
-        // The game starts several searches (auto-targeting, interaction, equipment targeting, ping, some ranged
-        // skills) at the camera position and pads the range with the camera-to-body distance. A camera that sits
-        // farther than vanilla would change those cones and ranges, so move the search origin forward by the extra
-        // distance we added; the far end of every search stays exactly where it was.
-        public static void AimRayPost(ref Ray __result, ref float extraRaycastDistance)
-        {
-            if (!State.CameraOn) return;
-            float extra = extraRaycastDistance;
-            if (extra <= 0.001f) return; // no camera rig applied, original ray was returned
-            float shift = Mathf.Min(Cfg.ExtraDistance.Value, extra);
-            if (shift <= 0f) return;
-            Ray r = __result;
-            r.origin += r.direction * shift;
-            __result = r;
-            extraRaycastDistance = extra - shift;
-        }
-
-        // Sprint FOV widening.
-        private static FieldInfo sprintField;
-        public static void CameraUpdatePost(object rawInstanceData, ref CameraModeBase.UpdateResult result)
-        {
-            if (!State.FovOn) return;
-            float keep = Cfg.SprintFovScale.Value;
-            if (keep >= 0.999f || rawInstanceData == null) return;
-            if (sprintField == null)
-                sprintField = rawInstanceData.GetType().GetField("sprintFovMultiplier", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (sprintField == null) return;
-            float m = (float)sprintField.GetValue(rawInstanceData);
-            if (m < 0.01f) return;
-            result.cameraState.fov = result.cameraState.fov / m * Mathf.Lerp(1f, m, keep);
-        }
-
-        // Mouse look smoothing / flick limiter. Smoothing conserves total turned angle.
-        private static Vector2 pendingLook;
-        public static void LookInputPost(ref CameraModeBase.CollectLookInputResult output)
-        {
-            if (!State.MouseOn)
-            {
-                // Hand over anything still pending so no motion is lost when toggling off.
-                output.lookInput += pendingLook;
-                pendingLook = Vector2.zero;
-                return;
-            }
-
-            Vector2 v = output.lookInput;
-
-            float maxD = Cfg.MaxLookPerFrame.Value;
-            if (maxD > 0f && v.magnitude > maxD) v = v.normalized * maxD;
-
-            float tau = Cfg.LookSmoothing.Value;
-            if (tau > 0f)
-            {
-                pendingLook += v;
-                float a = 1f - Mathf.Exp(-Time.unscaledDeltaTime / tau);
-                v = pendingLook * a;
-                pendingLook -= v;
-            }
-            else
-            {
-                pendingLook = Vector2.zero;
-            }
-            output.lookInput = v;
-        }
-
-        // Depth fog / haze: scale the intensity of the game's RampFog post-process for the duration of its render.
-        private static RampFog FogSettings(object renderer)
-        {
-            return ((PostProcessEffectRenderer<RampFog>)renderer).settings;
-        }
-
-        public static void FogPre(object __instance, out float __state)
-        {
-            __state = -1f;
-            float s = State.VisualsOn ? Cfg.FogScale.Value : 1f;
-            if (s >= 0.999f) return;
-            RampFog fog = FogSettings(__instance);
-            if (fog == null) return;
-            __state = fog.fogIntensity.value;
-            fog.fogIntensity.value = __state * s;
-        }
-
-        public static void FogPost(object __instance, float __state)
-        {
-            if (__state < 0f) return;
-            RampFog fog = FogSettings(__instance);
-            if (fog != null) fog.fogIntensity.value = __state;
-        }
-
-        // Menu "NEW" badge text overlaps long labels in some languages: blank it before it is written to the label.
-        public static void NewBadgePre(string ____token, ref string ___resolvedString)
-        {
-            if (Cfg.HideNewBadges.Value && ____token == "NEW_UNLOCKABLE") ___resolvedString = "";
-        }
-
-        // Startup: skip logo splash + intro video. Uses the game's own skip path (same as the splash_skip / intro_skip convars).
-        // Must NOT jump to the title before the game finished loading (profiles are read at the end of the load),
-        // otherwise the title shows "create profile". So we wait for RoR2Application.loadFinished first.
-        private static bool splashFinishAllowed;
-        private static bool splashWaiting;
-
-        public static bool SplashStartPre(SplashScreenController __instance)
-        {
-            if (!Cfg.SkipIntro.Value) return true;
-            FinishWhenLoaded(__instance);
-            return false;
-        }
-
-        // Ignore the splash animation calling Finish() before loading is done; we call it ourselves when ready.
-        public static bool SplashFinishPre(SplashScreenController __instance)
-        {
-            if (!Cfg.SkipIntro.Value) return true;
-            if (splashFinishAllowed) return true;
-            FinishWhenLoaded(__instance);
-            return false;
-        }
-
-        private static void FinishWhenLoaded(SplashScreenController instance)
-        {
-            if (RoR2Application.loadFinished)
-            {
-                DoFinish(instance);
-            }
-            else if (!splashWaiting)
-            {
-                splashWaiting = true;
-                RoR2Application.onLoad += () => { if (instance) DoFinish(instance); };
-            }
-        }
-
-        private static void DoFinish(SplashScreenController instance)
-        {
-            splashFinishAllowed = true;
-            IntroCutsceneController.shouldSkip = true;
-            instance.Finish();
-        }
-
-        public static bool DamageNumberPre()
-        {
-            if (!State.VisualsOn) return true;
-            return !Cfg.HideDamageNumbers.Value;
-        }
-
-        public static void ScreenDamagePre(ScreenDamage __instance)
-        {
-            float s = State.VisualsOn ? Cfg.ScreenDamageScale.Value : 1f;
-            __instance.DistortionScale = s;
-            __instance.DesaturationScale = s;
-            __instance.TintScale = s;
-        }
-
-        // Particle count scaling. Original values are remembered per system so pooled effects don't compound.
-        private class Original
-        {
-            public float rate;
-            public int maxParticles;
-            public ParticleSystem.Burst[] bursts;
-        }
-
-        private static readonly ConditionalWeakTable<ParticleSystem, Original> originals = new ConditionalWeakTable<ParticleSystem, Original>();
-        private static readonly List<ParticleSystem> buffer = new List<ParticleSystem>();
-
-        public static void EffectResetPost(EffectComponent __instance)
-        {
-            float s = State.VisualsOn ? Cfg.ParticleCountScale.Value : 1f;
-
-            __instance.GetComponentsInChildren(true, buffer);
-            for (int i = 0; i < buffer.Count; i++)
-            {
-                ParticleSystem ps = buffer[i];
-                // Particle systems that drive trigger/collision events can be gameplay-relevant: leave them alone.
-                if (ps.trigger.enabled || ps.collision.enabled) continue;
-                if (!originals.TryGetValue(ps, out Original o))
-                {
-                    if (s >= 0.999f) continue; // nothing changed yet, nothing to restore
-                    o = new Original();
-                    ParticleSystem.EmissionModule em0 = ps.emission;
-                    o.rate = em0.rateOverTimeMultiplier;
-                    o.maxParticles = ps.main.maxParticles;
-                    o.bursts = new ParticleSystem.Burst[em0.burstCount];
-                    em0.GetBursts(o.bursts);
-                    originals.Add(ps, o);
-                }
-
-                ParticleSystem.EmissionModule em = ps.emission;
-                em.rateOverTimeMultiplier = o.rate * s;
-
-                if (o.bursts.Length > 0)
-                {
-                    ParticleSystem.Burst[] scaled = new ParticleSystem.Burst[o.bursts.Length];
-                    for (int b = 0; b < scaled.Length; b++)
-                    {
-                        ParticleSystem.Burst burst = o.bursts[b];
-                        ParticleSystem.MinMaxCurve c = burst.count;
-                        // Leave tiny bursts (flash quads, single sprites) alone so effects don't vanish.
-                        if (s < 0.999f)
-                        {
-                            if (c.mode == ParticleSystemCurveMode.Constant && c.constant > 2f)
-                                c.constant = Mathf.Max(2f, c.constant * s);
-                            else if (c.mode == ParticleSystemCurveMode.TwoConstants && c.constantMax > 2f)
-                            {
-                                c.constantMin = Mathf.Max(1f, c.constantMin * s);
-                                c.constantMax = Mathf.Max(2f, c.constantMax * s);
-                            }
-                        }
-                        burst.count = c;
-                        scaled[b] = burst;
-                    }
-                    em.SetBursts(scaled);
-                }
-
-                ParticleSystem.MainModule main = ps.main;
-                main.maxParticles = o.maxParticles > 8 ? Mathf.Max(8, Mathf.RoundToInt(o.maxParticles * s)) : o.maxParticles;
-            }
-            buffer.Clear();
-        }
-    }
-
-    internal static class OptionsUi
-    {
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void Register()
-        {
-            RiskOfOptions.ModSettingsManager.SetModDescription("Reduces motion sickness triggers: camera, shake, FOV, mouse, flashes, particles, color. F7 = mod on/off, F2-F6 = groups.");
-            Slider(Cfg.ExtraDistance, 0f, 30f, "{0:0.0}");
-            Slider(Cfg.ExtraHeight, 0f, 15f, "{0:0.0}");
-            Slider(Cfg.ShakeScale, 0f, 1f, "{0:0.00}");
-            Slider(Cfg.RecoilScale, 0f, 1f, "{0:0.00}");
-            Slider(Cfg.SprintFovScale, 0f, 1f, "{0:0.00}");
-            Check(Cfg.LimitAbilityFov);
-            Slider(Cfg.AbilityFovMaxIncrease, 0f, 40f, "{0:0}");
-            Slider(Cfg.LookSmoothing, 0f, 0.2f, "{0:0.000}");
-            Slider(Cfg.MaxLookPerFrame, 0f, 30f, "{0:0.0}");
-            Check(Cfg.HideDamageNumbers);
-            Slider(Cfg.ScreenDamageScale, 0f, 1f, "{0:0.00}");
-            Slider(Cfg.ParticleCountScale, 0.05f, 1f, "{0:0.00}");
-            Slider(Cfg.Saturation, -100f, 0f, "{0:0}");
-            Slider(Cfg.Contrast, -50f, 50f, "{0:0}");
-            Slider(Cfg.Exposure, -3f, 2f, "{0:0.0}");
-            Slider(Cfg.FogScale, 0f, 1f, "{0:0.00}");
-            Check(Cfg.LimitBloom);
-            Slider(Cfg.BloomIntensity, 0f, 3f, "{0:0.00}");
-            Check(Cfg.HideNewBadges);
-            Check(Cfg.SkipIntro);
-            Check(Cfg.ShowIndicator);
-        }
-
-        private static void Slider(ConfigEntry<float> e, float min, float max, string fmt)
-        {
-            RiskOfOptions.ModSettingsManager.AddOption(new RiskOfOptions.Options.SliderOption(e,
-                new RiskOfOptions.OptionConfigs.SliderConfig { min = min, max = max, FormatString = fmt }));
-        }
-
-        private static void Check(ConfigEntry<bool> e)
-        {
-            RiskOfOptions.ModSettingsManager.AddOption(new RiskOfOptions.Options.CheckBoxOption(e));
         }
     }
 }
