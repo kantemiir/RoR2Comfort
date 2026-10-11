@@ -23,8 +23,8 @@ namespace RoR2Comfort
             ru = Application.systemLanguage == SystemLanguage.Russian;
 
             RiskOfOptions.ModSettingsManager.SetModDescription(T(
-                "Reduces motion sickness triggers. F7 = whole mod on/off, F8 = strength, F2-F6 = groups.",
-                "Снижает причины укачивания. F7 = весь мод вкл/выкл, F8 = сила, F2-F6 = отдельные группы."));
+                "Reduces motion sickness triggers. Hotkeys are unassigned by default (see the config file, [Hotkeys]).",
+                "Снижает причины укачивания. Горячие клавиши по умолчанию не назначены (см. файл настроек, раздел [Hotkeys])."));
 
             string general = T("General", "Общее");
             string camera = T("Camera & mouse", "Камера и мышь");
@@ -34,8 +34,8 @@ namespace RoR2Comfort
             // ---- General
             Slider(Cfg.Strength, general, 0f, 1f, "{0:0%}",
                 T("Overall strength", "Общая сила мода"),
-                T("100% = all your settings, 0% = like the original game. F8 cycles 100/70/40%.",
-                  "100% = все ваши настройки, 0% = как в оригинальной игре. F8 переключает 100/70/40%."));
+                T("100% = all your settings, 0% = like the original game.",
+                  "100% = все ваши настройки, 0% = как в оригинальной игре."));
             Check(Cfg.Progressive, general,
                 T("Ramp up with stage", "Усиливать по стадиям"),
                 T("Gentle on the first stages, full strength in the late game.",
@@ -56,8 +56,8 @@ namespace RoR2Comfort
                 T("The badge text overlaps long labels in some languages.", "Надпись налезает на длинные названия в некоторых языках."));
             Check(Cfg.ShowIndicator, general,
                 T("Show COMFORT label on screen", "Показывать надпись COMFORT на экране"),
-                T("Small label at the top. Toggling always flashes the screen green/red.",
-                  "Небольшая надпись сверху. При переключении экран всегда вспыхивает зелёным/красным."));
+                T("Small label at the top, plus a green/red screen flash on startup and when a hotkey toggles the mod. Off by default.",
+                  "Небольшая надпись сверху и зелёная/красная вспышка при запуске и при переключении мода клавишей. По умолчанию выключено."));
 
             // ---- Camera & mouse
             Slider(Cfg.ExtraDistance, camera, 0f, 30f, "{0:0.0}",
