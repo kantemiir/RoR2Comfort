@@ -113,7 +113,7 @@ namespace RoR2Comfort
 
         public static void Bind(ConfigFile c)
         {
-            Strength = c.Bind("General", "Strength", 1f, "Overall comfort strength: 1 = your configured values, 0 = vanilla. Everything below is blended by this. F8 cycles 100% / 70% / 40%.");
+            Strength = c.Bind("General", "Strength", 1f, "Overall comfort strength: 1 = your configured values, 0 = vanilla. Everything below is blended by this. Can be cycled 100% / 70% / 40% with the StrengthCycle hotkey.");
             Progressive = c.Bind("General", "ProgressiveComfort", false, "Ramp the strength up with the stage number: gentle early, full strength in the late game.");
             ProgressiveStart = c.Bind("General", "ProgressiveStartStrength", 0.35f, "[Advanced] Strength on stage 1 when ProgressiveComfort is on.");
             ProgressiveFullAt = c.Bind("General", "ProgressiveFullAtStage", 5, "Stage number at which full strength is reached when ProgressiveComfort is on.");
@@ -155,15 +155,16 @@ namespace RoR2Comfort
             AutoColorStrength = c.Bind("Color", "AutoColorStrength", 0.6f, "Automatically pulls an overwhelmingly one-colored scene (e.g. an all-red stage) back toward neutral. 0 = off; higher = even mildly tinted scenes get corrected. Normal-looking scenes are left alone at the default.");
 
             SkipIntro = c.Bind("Startup", "SkipIntro", true, "Skip the startup splash screens and the intro cutscene video and go straight to the title screen. Applies on the next game start.");
-            ShowIndicator = c.Bind("Indicator", "ShowIndicator", true, "Show a small COMFORT ON/OFF label at the top of the screen. Toggling always flashes the screen green/red.");
+            ShowIndicator = c.Bind("Indicator", "ShowIndicator", false, "Show a small COMFORT ON/OFF label at the top of the screen and flash the screen green/red when toggling or at startup. Off by default.");
 
-            MasterKey = c.Bind("Hotkeys", "MasterToggle", new KeyboardShortcut(KeyCode.F7), "Mod on/off (green/red flash). Off = fully vanilla.");
-            CameraKey = c.Bind("Hotkeys", "CameraToggle", new KeyboardShortcut(KeyCode.F2), "Toggle camera distance/height.");
-            ShakeKey = c.Bind("Hotkeys", "ShakeToggle", new KeyboardShortcut(KeyCode.F3), "Toggle shake and recoil reduction.");
-            FovKey = c.Bind("Hotkeys", "FovToggle", new KeyboardShortcut(KeyCode.F4), "Toggle FOV limits.");
-            MouseKey = c.Bind("Hotkeys", "MouseToggle", new KeyboardShortcut(KeyCode.F5), "Toggle mouse smoothing and aim stickiness.");
-            VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.F6), "Toggle colors, bloom, flashes, particles and damage numbers.");
-            StrengthKey = c.Bind("Hotkeys", "StrengthCycle", new KeyboardShortcut(KeyCode.F8), "Cycle overall strength 100% / 70% / 40%.");
+            // All hotkeys are unassigned by default. To use one, write a key name, e.g.  MasterToggle = F7
+            MasterKey = c.Bind("Hotkeys", "MasterToggle", new KeyboardShortcut(KeyCode.None), "Mod on/off (green/red flash). Off = fully vanilla. Unassigned by default, e.g. F7.");
+            CameraKey = c.Bind("Hotkeys", "CameraToggle", new KeyboardShortcut(KeyCode.None), "Toggle camera distance/height. Unassigned by default, e.g. F2.");
+            ShakeKey = c.Bind("Hotkeys", "ShakeToggle", new KeyboardShortcut(KeyCode.None), "Toggle shake and recoil reduction. Unassigned by default, e.g. F3.");
+            FovKey = c.Bind("Hotkeys", "FovToggle", new KeyboardShortcut(KeyCode.None), "Toggle FOV limits. Unassigned by default, e.g. F4.");
+            MouseKey = c.Bind("Hotkeys", "MouseToggle", new KeyboardShortcut(KeyCode.None), "Toggle mouse smoothing and aim stickiness. Unassigned by default, e.g. F5.");
+            VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.None), "Toggle colors, bloom, flashes, particles and damage numbers. Unassigned by default, e.g. F6.");
+            StrengthKey = c.Bind("Hotkeys", "StrengthCycle", new KeyboardShortcut(KeyCode.None), "Cycle overall strength 100% / 70% / 40%. Unassigned by default, e.g. F8.");
 
             c.SettingChanged += (s, a) => { if (Changed != null) Changed(); };
         }
