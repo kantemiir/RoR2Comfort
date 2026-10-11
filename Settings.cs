@@ -93,10 +93,6 @@ namespace RoR2Comfort
         public static ConfigEntry<bool> LimitAbilityFov;
         public static ConfigEntry<float> LookSmoothing, MaxLookPerFrame, AimStickiness;
 
-        // Vignette
-        public static ConfigEntry<float> VignetteMax, VignetteSensitivity, VignetteSmoothness;
-        public static ConfigEntry<float> VignetteSpeedStart, VignetteSpeedFull, VignetteTurnStart, VignetteTurnFull;
-
         // HUD / effects
         public static ConfigEntry<DamageNumberMode> DamageNumbers;
         public static ConfigEntry<float> DamageNumberWindow;
@@ -137,14 +133,6 @@ namespace RoR2Comfort
             MaxLookPerFrame = c.Bind("Mouse", "MaxLookPerFrame", 0f, "[Advanced] Max camera turn per frame in degrees (limits sudden flicks). 0 = off.");
             AimStickiness = c.Bind("Mouse", "AimStickiness", 0f, "ASSIST (changes difficulty, off by default): slows the mouse by this fraction while the crosshair is over an enemy, so small corrections need less flicking. 0 = off.");
 
-            VignetteMax = c.Bind("Vignette", "VignetteMax", 0.4f, "Comfort vignette: the screen edges darken while you move fast or turn fast, like VR comfort modes. Maximum intensity (0 = off, 1 = very dark edges).");
-            VignetteSensitivity = c.Bind("Vignette", "VignetteSensitivity", 1f, "How easily the vignette appears: 1 = default thresholds, 2 = twice as sensitive, 0.5 = half as sensitive.");
-            VignetteSmoothness = c.Bind("Vignette", "VignetteSmoothness", 0.55f, "[Advanced] Softness of the vignette edge (0.01..1).");
-            VignetteSpeedStart = c.Bind("Vignette", "SpeedStart", 14f, "[Advanced] Camera speed (units/s) where the vignette starts to appear.");
-            VignetteSpeedFull = c.Bind("Vignette", "SpeedFull", 40f, "[Advanced] Camera speed (units/s) for the full vignette.");
-            VignetteTurnStart = c.Bind("Vignette", "TurnStart", 150f, "[Advanced] Turn rate (degrees/s) where the vignette starts to appear.");
-            VignetteTurnFull = c.Bind("Vignette", "TurnFull", 500f, "[Advanced] Turn rate (degrees/s) for the full vignette.");
-
             DamageNumbers = c.Bind("Hud", "DamageNumbers", DamageNumberMode.Aggregate, "Show = vanilla, Aggregate = one summed number per target every DamageNumberWindow seconds, Hide = none.");
             DamageNumberWindow = c.Bind("Hud", "DamageNumberWindow", 0.5f, "[Advanced] Seconds over which damage numbers are summed in Aggregate mode.");
             ScreenDamageScale = c.Bind("Hud", "ScreenDamageScale", 0.3f, "Strength of the red hurt tint / desaturation / distortion AND of the game's full-screen flash effects (storms, worm death, beams): 0 = none, 1 = vanilla.");
@@ -174,7 +162,7 @@ namespace RoR2Comfort
             ShakeKey = c.Bind("Hotkeys", "ShakeToggle", new KeyboardShortcut(KeyCode.F3), "Toggle shake and recoil reduction.");
             FovKey = c.Bind("Hotkeys", "FovToggle", new KeyboardShortcut(KeyCode.F4), "Toggle FOV limits.");
             MouseKey = c.Bind("Hotkeys", "MouseToggle", new KeyboardShortcut(KeyCode.F5), "Toggle mouse smoothing and aim stickiness.");
-            VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.F6), "Toggle colors, bloom, vignette, flashes, particles and damage numbers.");
+            VisualsKey = c.Bind("Hotkeys", "VisualsToggle", new KeyboardShortcut(KeyCode.F6), "Toggle colors, bloom, flashes, particles and damage numbers.");
             StrengthKey = c.Bind("Hotkeys", "StrengthCycle", new KeyboardShortcut(KeyCode.F8), "Cycle overall strength 100% / 70% / 40%.");
 
             c.SettingChanged += (s, a) => { if (Changed != null) Changed(); };
